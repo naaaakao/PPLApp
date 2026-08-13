@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kotaro Workout</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <header>
+    <h1>🏋️ Kotaro Workout</h1>
+    <p>今日も1%強くなる。</p>
+  </header>
+
+  <main>
+
+    <section class="weight-card">
+      <h2>Current Weight</h2>
+
+      <div class="weight-display">
+        <span id="currentWeight">67</span>
+        <span>kg</span>
+      </div>
+    </section>
+
+    <section class="workout-section">
+
+      <div class="workout-card">
+        <h2>Push</h2>
+
+        <div class="exercise">
+            <span>Bench Press</span>
+            <button class="start-btn">▶</button>
+          </div>
+
+        <div class="exercise">
+          <span>Incline Bench Press</span>
+          <button class="start-btn">▶</button>
+        </div>
+
+        <div class="exercise">
+          <span>Shoulder Press</span>
+          <button class="start-btn">▶</button>
+        </div>
+
+        <div class="exercise">
+          <span>Side Raise</span>
+          <button class="start-btn">▶</button>
+        </div>
+
+        <div class="exercise">
+          <span>Triceps Pushdown</span>
+          <button class="start-btn">▶</button>
+        </div>
+      </div>
+
+      <div class="workout-card">
+        <h2>Pull</h2>
+
+        <div class="exercise">
+          <span>Lat Pulldown</span>
+          <button class="start-btn">▶</button>
+        </div>
+
+        <div class="exercise">
+          <span>Seated Row</span>
+          <button class="start-btn">▶</button>
+        </div>
+
+        <div class="exercise">
+          <span>Rear Delt Fly</span>
+          <button class="start-btn">▶</button>
+        </div>
+
+        <div class="exercise">
+          <span>Dumbbell Curl</span>
+          <button class="start-btn">▶</button>
+        </div>
+
+        <div class="exercise">
+          <span>Incline Dumbbell Curl</span>
+          <button class="start-btn">▶</button>
+        </div>
+      </div>
+
+      <div class="workout-card">
+        <h2>Leg</h2>
+
+        <div class="exercise">
+          <span>Squat</span>
+          <button class="start-btn">▶</button>
+        </div>
+
+        <div class="exercise">
+          <span>Leg Press</span>
+          <button class="start-btn">▶</button>
+        </div>
+
+        <div class="exercise">
+          <span>Romanian Deadlift</span>
+          <button class="start-btn">▶</button>
+        </div>
+
+        <div class="exercise">
+          <span>Calf Raise</span>
+          <button class="start-btn">▶</button>
+        </div>
+      </div>
+
+    </section>
+
+    <section class="history-section">
+        <h2>Workout History</h2>
+      
+        <div id="historyList">
+        </div>
+      </section>    
+
+  </main>
+
+  <div id="workoutModal" class="modal">
+
+    <div class="modal-content">
+  
+      <button id="closeModal" class="close-btn">×</button>
+  
+      <h2 id="modalExerciseName">Exercise</h2>
+  
+      <div class="input-group">
+        <label>Weight</label>
+        <input id="weightInput" type="number" placeholder="60">
+        <span>kg</span>
+      </div>
+  
+      <div class="input-group">
+        <label>Reps</label>
+        <input id="repsInput" type="number" placeholder="10">
+        <span>reps</span>
+      </div>
+  
+      <div class="input-group">
+        <label>Sets</label>
+        <input id="setsInput" type="number" placeholder="3">
+        <span>sets</span>
+      </div>
+  
+      <button id="saveWorkoutBtn" class="save-btn">
+        Save Workout
+      </button>
+  
+    </div>
+  
+  </div>
+
+<script src="script.js"></script>
+</body>
+</html>

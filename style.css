@@ -1,0 +1,191 @@
+* {
+    box-sizing: border-box;
+  }
+  
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f4f4f4;
+    color: #222;
+  }
+  
+  header {
+    background: #111;
+    color: white;
+    padding: 24px;
+    text-align: center;
+  }
+  
+  header h1 {
+    margin: 0;
+  }
+  
+  header p {
+    margin-top: 8px;
+    color: #bbb;
+  }
+  
+  main {
+    width: 90%;
+    max-width: 1000px;
+    margin: 30px auto;
+  }
+  
+  .weight-card {
+    background: white;
+    padding: 24px;
+    border-radius: 16px;
+    margin-bottom: 25px;
+    text-align: center;
+  }
+  
+  .weight-card h2 {
+    margin-top: 0;
+  }
+  
+  .weight-display {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    font-size: 32px;
+    font-weight: bold;
+  }
+  
+  .workout-section {
+    display: flex;
+    gap: 20px;
+  }
+  
+  .workout-card {
+    flex: 1;
+    background: white;
+    padding: 20px;
+    border-radius: 16px;
+  }
+  
+  .workout-card h2 {
+    margin-top: 0;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 10px;
+  }
+  
+  .exercise {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 0;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .exercise button {
+    border: none;
+    background: #111;
+    color: white;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  
+  .exercise button:hover {
+    opacity: 0.7;
+  }
+  
+  @media (max-width: 700px) {
+  
+    .workout-section {
+      flex-direction: column;
+    }
+  
+  }
+
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  
+    background: rgba(0, 0, 0, 0.6);
+  
+    justify-content: center;
+    align-items: center;
+  
+    z-index: 9999;
+  }
+  
+  .modal.show {
+    display: flex !important;
+  }
+  
+  .modal-content {
+    position: relative;
+    background: white;
+    width: 90%;
+    max-width: 420px;
+    padding: 28px;
+    border-radius: 18px;
+  }
+  
+  .close-btn {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+  
+    border: none;
+    background: none;
+    font-size: 28px;
+    cursor: pointer;
+  }
+  
+  .input-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 20px 0;
+  }
+  
+  .input-group label {
+    width: 70px;
+  }
+  
+  .input-group input {
+    flex: 1;
+    padding: 10px;
+    font-size: 16px;
+  }
+  
+  .save-btn {
+    width: 100%;
+    padding: 14px;
+  
+    border: none;
+    border-radius: 10px;
+  
+    background: #111;
+    color: white;
+  
+    font-size: 16px;
+    font-weight: bold;
+  
+    cursor: pointer;
+  }  
+
+  .history-section {
+    background: white;
+    margin-top: 25px;
+    padding: 20px;
+    border-radius: 16px;
+  }
+  
+  .history-item {
+    padding: 14px 0;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .history-item strong {
+    display: block;
+    margin-bottom: 5px;
+  }  
