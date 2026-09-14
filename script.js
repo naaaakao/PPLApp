@@ -1,953 +1,657 @@
 console.log("Workout App started!");
 
-const startButtons = document.querySelectorAll(".start-btn");
+// ============================================================
+// 種目マスター
+// ============================================================
 
-console.log("JS loaded");
-console.log(startButtons);
+const EXERCISES = [
+  { exerciseId: "push-bench-press", name: "Bench Press", category: "Push", defaultWeight: 42.5, defaultReps: 8, defaultSets: 3, defaultRestTime: 180 },
+  { exerciseId: "push-smith-incline-bench-press", name: "Smith Incline Bench Press", category: "Push", defaultWeight: null, defaultReps: 10, defaultSets: 3, defaultRestTime: 150 },
+  { exerciseId: "push-ohp", name: "OHP", category: "Push", defaultWeight: 20, defaultReps: 10, defaultSets: 3, defaultRestTime: 120 },
+  { exerciseId: "push-db-side-raise", name: "DB Side Raise", category: "Push", defaultWeight: 12, defaultReps: 15, defaultSets: 4, defaultRestTime: 90 },
+  { exerciseId: "push-skull-crusher", name: "Skull Crusher", category: "Push", defaultWeight: 15, defaultReps: 12, defaultSets: 3, defaultRestTime: 90 },
+  { exerciseId: "push-cable-pressdown", name: "Cable Pressdown", category: "Push", defaultWeight: 15, defaultReps: 12, defaultSets: 2, defaultRestTime: 90 },
+  { exerciseId: "pull-pull-up", name: "Pull Up", category: "Pull", defaultWeight: null, defaultReps: 8, defaultSets: 3, defaultRestTime: 150 },
+  { exerciseId: "pull-seated-cable-row", name: "Seated Cable Row", category: "Pull", defaultWeight: 30, defaultReps: 10, defaultSets: 3, defaultRestTime: 120 },
+  { exerciseId: "pull-lat-pulldown", name: "Lat Pulldown", category: "Pull", defaultWeight: 30, defaultReps: 12, defaultSets: 3, defaultRestTime: 120 },
+  { exerciseId: "pull-rear-delt-fly", name: "Rear Delt Fly", category: "Pull", defaultWeight: null, defaultReps: 15, defaultSets: 3, defaultRestTime: 90 },
+  { exerciseId: "pull-ez-bar-curl", name: "EZ Bar Curl", category: "Pull", defaultWeight: 20.5, defaultReps: 10, defaultSets: 3, defaultRestTime: 90 },
+  { exerciseId: "pull-incline-db-curl", name: "Incline DB Curl", category: "Pull", defaultWeight: 12, defaultReps: 12, defaultSets: 3, defaultRestTime: 90 },
+  { exerciseId: "legs-barbell-squat", name: "Barbell Squat", category: "Legs", defaultWeight: 60, defaultReps: 8, defaultSets: 3, defaultRestTime: 180 },
+  { exerciseId: "legs-rdl", name: "RDL", category: "Legs", defaultWeight: 40, defaultReps: 10, defaultSets: 3, defaultRestTime: 150 },
+  { exerciseId: "legs-leg-press", name: "Leg Press", category: "Legs", defaultWeight: 70, defaultReps: 12, defaultSets: 3, defaultRestTime: 120 },
+  { exerciseId: "legs-leg-curl", name: "Leg Curl", category: "Legs", defaultWeight: 45, defaultReps: 12, defaultSets: 3, defaultRestTime: 90 },
+  { exerciseId: "legs-leg-extension", name: "Leg Extension", category: "Legs", defaultWeight: 35, defaultReps: 12, defaultSets: 3, defaultRestTime: 90 },
+  { exerciseId: "legs-calf-raise", name: "Calf Raise", category: "Legs", defaultWeight: 40, defaultReps: 15, defaultSets: 4, defaultRestTime: 90 }
+];
 
+const EXERCISE_BY_ID = new Map(EXERCISES.map((exercise) => [exercise.exerciseId, exercise]));
+const EXERCISE_BY_NAME = new Map(EXERCISES.map((exercise) => [exercise.name, exercise]));
+
+// ============================================================
+// 共通ユーティリティ・データ保存
+// ============================================================
+
+const STORAGE_KEYS = Object.freeze({
+  workoutHistory: "workoutHistory",
+  workoutSessions: "workoutSessions",
+  bodyWeightHistory: "bodyWeightHistory"
+});
+
+function loadArray(key) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key));
+    return Array.isArray(value) ? value : [];
+  } catch (error) {
+    console.warn(`Failed to load localStorage key: ${key}`, error);
+    return [];
+  }
+}
+
+function saveArray(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (error) {
+    console.error(`Failed to save localStorage key: ${key}`, error);
+    return false;
+  }
+}
+
+function createId(prefix) {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function createTimestamp() {
+  const now = new Date();
+  return {
+    createdAt: now.toISOString(),
+    date: now.toLocaleDateString()
+  };
+}
+
+function toFiniteNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function findExerciseForRecord(record) {
+  return EXERCISE_BY_ID.get(record.exerciseId) || EXERCISE_BY_NAME.get(record.exercise);
+}
+
+function normalizeWorkoutRecord(record) {
+  const exercise = findExerciseForRecord(record);
+
+  return {
+    ...record,
+    recordId: record.recordId || createId("record"),
+    exerciseId: record.exerciseId || exercise?.exerciseId || "",
+    exercise: record.exercise || exercise?.name || "Unknown Exercise",
+    sets: Array.isArray(record.sets)
+      ? record.sets.map((set) => ({
+          weight: toFiniteNumber(set.weight),
+          reps: toFiniteNumber(set.reps)
+        }))
+      : record.sets,
+    restTime: toFiniteNumber(record.restTime, 90),
+    createdAt: record.createdAt || null,
+    useAsNextDefault: record.useAsNextDefault === true
+  };
+}
+
+function getWorkoutHistory() {
+  return loadArray(STORAGE_KEYS.workoutHistory).map(normalizeWorkoutRecord);
+}
+
+function saveWorkoutHistory(history) {
+  return saveArray(STORAGE_KEYS.workoutHistory, history);
+}
+
+function normalizeSessionRecord(session) {
+  return {
+    ...session,
+    sessionId: session.sessionId || createId("session"),
+    type: typeof session.type === "string" ? session.type : "",
+    duration: toFiniteNumber(session.duration),
+    createdAt: session.createdAt || null
+  };
+}
+
+function getWorkoutSessions() {
+  return loadArray(STORAGE_KEYS.workoutSessions).map(normalizeSessionRecord);
+}
+
+function saveWorkoutSessions(sessions) {
+  return saveArray(STORAGE_KEYS.workoutSessions, sessions);
+}
+
+function getBodyWeightHistory() {
+  return loadArray(STORAGE_KEYS.bodyWeightHistory).map((record) => ({
+    ...record,
+    weight: toFiniteNumber(record.weight),
+    createdAt: record.createdAt || null
+  }));
+}
+
+function saveBodyWeightHistory(history) {
+  return saveArray(STORAGE_KEYS.bodyWeightHistory, history);
+}
+
+// ============================================================
+// DOM参照・基本画面描画
+// ============================================================
+
+const workoutSection = document.getElementById("workoutSection");
 const modal = document.getElementById("workoutModal");
 const closeModalButton = document.getElementById("closeModal");
 const modalExerciseName = document.getElementById("modalExerciseName");
-
-
-  const exerciseDefaults = {
-
-    // PUSH
-    "Bench Press": {
-      weight: 42.5,
-      reps: 8,
-      sets: 3,
-      rest: 180
-    },
-  
-    "Smith Incline Bench Press": {
-      weight: "",
-      reps: 10,
-      sets: 3,
-      rest: 150
-    },
-  
-    "OHP": {
-      weight: 20,
-      reps: 10,
-      sets: 3,
-      rest: 120
-    },
-  
-    "DB Side Raise": {
-      weight: 12,
-      reps: 15,
-      sets: 4,
-      rest: 90
-    },
-  
-    "Skull Crusher": {
-      weight: 15,
-      reps: 12,
-      sets: 3,
-      rest: 90
-    },
-  
-    "Cable Pressdown": {
-      weight: 15,
-      reps: 12,
-      sets: 2,
-      rest: 90
-    },
-  
-    // PULL
-    "Pull Up": {
-      weight: "",
-      reps: 8,
-      sets: 3,
-      rest: 150
-    },
-  
-    "Seated Cable Row": {
-      weight: 30,
-      reps: 10,
-      sets: 3,
-      rest: 120
-    },
-  
-    "Lat Pulldown": {
-      weight: 30,
-      reps: 12,
-      sets: 3,
-      rest: 120
-    },
-  
-    "Rear Delt Fly": {
-      weight: "",
-      reps: 15,
-      sets: 3,
-      rest: 90
-    },
-  
-    "EZ Bar Curl": {
-      weight: 20.5,
-      reps: 10,
-      sets: 3,
-      rest: 90
-    },
-  
-    "Incline DB Curl": {
-      weight: 12,
-      reps: 12,
-      sets: 3,
-      rest: 90
-    },
-  
-    // LEGS
-    "Barbell Squat": {
-      weight: 60,
-      reps: 8,
-      sets: 3,
-      rest: 180
-    },
-  
-    "RDL": {
-      weight: 40,
-      reps: 10,
-      sets: 3,
-      rest: 150
-    },
-  
-    "Leg Press": {
-      weight: 70,
-      reps: 12,
-      sets: 3,
-      rest: 120
-    },
-  
-    "Leg Curl": {
-      weight: 45,
-      reps: 12,
-      sets: 3,
-      rest: 90
-    },
-  
-    "Leg Extension": {
-      weight: 35,
-      reps: 12,
-      sets: 3,
-      rest: 90
-    },
-  
-    "Calf Raise": {
-      weight: 40,
-      reps: 15,
-      sets: 4,
-      rest: 90
-    }
-  
-  };
-
-startButtons.forEach((button) => {
-
-    button.addEventListener("click", () => {
-  
-      console.log("BUTTON CLICKED");
-  
-      const exerciseName =
-        button.parentElement.querySelector("span").textContent;
-  
-      modalExerciseName.textContent = exerciseName;
-
-      setsContainer.innerHTML = "";
-
-const workoutHistory =
-  JSON.parse(localStorage.getItem("workoutHistory")) || [];
-
-const lastDefaultWorkout = workoutHistory
-  .slice()
-  .reverse()
-  .find((record) =>
-    record.exercise === exerciseName &&
-    record.useAsNextDefault === true &&
-    Array.isArray(record.sets)
-  );
-
-const defaults = exerciseDefaults[exerciseName];
-
-if (lastDefaultWorkout) {
-
-  lastDefaultWorkout.sets.forEach((set) => {
-    addSet(set.weight, set.reps);
-  });
-
-} else if (defaults) {
-
-  for (let i = 0; i < defaults.sets; i++) {
-    addSet(defaults.weight, defaults.reps);
-  }
-
-} else {
-
-  addSet();
-  addSet();
-  addSet();
-
-}
-
-if (
-  lastDefaultWorkout &&
-  lastDefaultWorkout.restTime
-) {
-
-  setRestTimer(lastDefaultWorkout.restTime);
-
-} else if (defaults) {
-
-  setRestTimer(defaults.rest);
-
-}
-
-document.getElementById("useAsNextDefault").checked = true;
-
-modal.classList.add("show");
-  
-    });
-  
-  });
-
-closeModalButton.addEventListener("click", () => {
-  modal.classList.remove("show");
-});
-
 const setsContainer = document.getElementById("setsContainer");
 const addSetBtn = document.getElementById("addSetBtn");
 const saveWorkoutBtn = document.getElementById("saveWorkoutBtn");
-const restTimeInput =
-  document.getElementById("restTimeInput");
+const useAsNextDefault = document.getElementById("useAsNextDefault");
+const historyList = document.getElementById("historyList");
+const restTimeInput = document.getElementById("restTimeInput");
+const restTimerDisplay = document.getElementById("restTimerDisplay");
+const startRestBtn = document.getElementById("startRestBtn");
+const resetRestBtn = document.getElementById("resetRestBtn");
+const currentWeight = document.getElementById("currentWeight");
+const bodyWeightInput = document.getElementById("bodyWeightInput");
+const saveWeightBtn = document.getElementById("saveWeightBtn");
+const workoutTimerDisplay = document.getElementById("workoutTimerDisplay");
+const workoutType = document.getElementById("workoutType");
+const startWorkoutBtn = document.getElementById("startWorkoutBtn");
+const finishWorkoutBtn = document.getElementById("finishWorkoutBtn");
+const sessionHistoryList = document.getElementById("sessionHistoryList");
+const weightChartCanvas = document.getElementById("weightChart");
+const exerciseChartSelect = document.getElementById("exerciseChartSelect");
+const exerciseChartCanvas = document.getElementById("exerciseChart");
 
-const restTimerDisplay =
-  document.getElementById("restTimerDisplay");
+let activeExerciseId = null;
 
-const startRestBtn =
-  document.getElementById("startRestBtn");
+function renderExerciseCards() {
+  workoutSection.innerHTML = "";
 
-const resetRestBtn =
-  document.getElementById("resetRestBtn");
+  ["Push", "Pull", "Legs"].forEach((category) => {
+    const card = document.createElement("div");
+    card.className = "workout-card";
 
-let restTimerInterval = null;
-let restSecondsRemaining = 90;
+    const heading = document.createElement("h2");
+    heading.textContent = category;
+    card.appendChild(heading);
 
-function updateRestTimerDisplay() {
+    EXERCISES.filter((exercise) => exercise.category === category).forEach((exercise) => {
+      const row = document.createElement("div");
+      row.className = "exercise";
 
-  const minutes =
-    Math.floor(restSecondsRemaining / 60);
+      const name = document.createElement("span");
+      name.textContent = exercise.name;
 
-  const seconds =
-    restSecondsRemaining % 60;
+      const button = document.createElement("button");
+      button.className = "start-btn";
+      button.type = "button";
+      button.dataset.exerciseId = exercise.exerciseId;
+      button.textContent = "▶";
 
-  restTimerDisplay.textContent =
-    `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      row.append(name, button);
+      card.appendChild(row);
+    });
+
+    workoutSection.appendChild(card);
+  });
 }
-
-
-function setRestTimer(seconds) {
-
-  clearInterval(restTimerInterval);
-
-  restSecondsRemaining = Number(seconds);
-
-  restTimeInput.value = seconds;
-
-  updateRestTimerDisplay();
-}
-
-
-startRestBtn.addEventListener("click", () => {
-
-  clearInterval(restTimerInterval);
-
-  restSecondsRemaining =
-    Number(restTimeInput.value);
-
-  updateRestTimerDisplay();
-
-  restTimerInterval = setInterval(() => {
-
-    restSecondsRemaining--;
-
-    updateRestTimerDisplay();
-
-    if (restSecondsRemaining <= 0) {
-
-      clearInterval(restTimerInterval);
-
-      restTimerInterval = null;
-
-      alert("休憩終了！");
-
-    }
-
-  }, 1000);
-
-});
-
-
-resetRestBtn.addEventListener("click", () => {
-
-  clearInterval(restTimerInterval);
-
-  restTimerInterval = null;
-
-  setRestTimer(restTimeInput.value);
-
-});
-
 
 function addSet(weight = "", reps = "") {
-
-  const setNumber = setsContainer.children.length + 1;
-
   const setRow = document.createElement("div");
   setRow.className = "set-row";
 
-  setRow.innerHTML = `
-    <span class="set-number">${setNumber}</span>
+  const setNumber = document.createElement("span");
+  setNumber.className = "set-number";
 
-    <div class="set-input">
-      <input
-        class="set-weight"
-        type="number"
-        step="0.5"
-        value="${weight}"
-        placeholder="kg"
-      >
-    </div>
+  const weightWrapper = document.createElement("div");
+  weightWrapper.className = "set-input";
+  const weightInput = document.createElement("input");
+  weightInput.className = "set-weight";
+  weightInput.type = "number";
+  weightInput.step = "0.5";
+  weightInput.placeholder = "kg";
+  weightInput.value = weight ?? "";
+  weightWrapper.appendChild(weightInput);
 
-    <div class="set-input">
-      <input
-        class="set-reps"
-        type="number"
-        value="${reps}"
-        placeholder="reps"
-      >
-    </div>
+  const repsWrapper = document.createElement("div");
+  repsWrapper.className = "set-input";
+  const repsInput = document.createElement("input");
+  repsInput.className = "set-reps";
+  repsInput.type = "number";
+  repsInput.placeholder = "reps";
+  repsInput.value = reps ?? "";
+  repsWrapper.appendChild(repsInput);
 
-    <button class="remove-set-btn">×</button>
-  `;
-
-  const removeButton =
-    setRow.querySelector(".remove-set-btn");
-
+  const removeButton = document.createElement("button");
+  removeButton.className = "remove-set-btn";
+  removeButton.type = "button";
+  removeButton.textContent = "×";
   removeButton.addEventListener("click", () => {
     setRow.remove();
     updateSetNumbers();
   });
 
+  setRow.append(setNumber, weightWrapper, repsWrapper, removeButton);
   setsContainer.appendChild(setRow);
+  updateSetNumbers();
 }
 
 function updateSetNumbers() {
-
-  const setRows =
-    setsContainer.querySelectorAll(".set-row");
-
-  setRows.forEach((row, index) => {
-    row.querySelector(".set-number").textContent =
-      index + 1;
+  setsContainer.querySelectorAll(".set-row").forEach((row, index) => {
+    row.querySelector(".set-number").textContent = index + 1;
   });
-
 }
 
-addSetBtn.addEventListener("click", () => {
-  addSet();
+// ============================================================
+// 種目別休憩タイマー
+// ============================================================
+
+let restTimerInterval = null;
+let restSecondsRemaining = 90;
+
+function updateRestTimerDisplay() {
+  const minutes = Math.floor(restSecondsRemaining / 60);
+  const seconds = restSecondsRemaining % 60;
+  restTimerDisplay.textContent =
+    `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function setRestTimer(seconds) {
+  clearInterval(restTimerInterval);
+  restTimerInterval = null;
+  restSecondsRemaining = toFiniteNumber(seconds, 90);
+  restTimeInput.value = restSecondsRemaining;
+  updateRestTimerDisplay();
+}
+
+startRestBtn.addEventListener("click", () => {
+  clearInterval(restTimerInterval);
+  restSecondsRemaining = toFiniteNumber(restTimeInput.value, 0);
+  updateRestTimerDisplay();
+
+  restTimerInterval = setInterval(() => {
+    restSecondsRemaining--;
+    updateRestTimerDisplay();
+
+    if (restSecondsRemaining <= 0) {
+      clearInterval(restTimerInterval);
+      restTimerInterval = null;
+      alert("休憩終了！");
+    }
+  }, 1000);
 });
+
+resetRestBtn.addEventListener("click", () => {
+  setRestTimer(restTimeInput.value);
+});
+
+// ============================================================
+// Workout種目記録
+// ============================================================
+
+function openWorkoutModal(exerciseId) {
+  const exercise = EXERCISE_BY_ID.get(exerciseId);
+  if (!exercise) return;
+
+  activeExerciseId = exercise.exerciseId;
+  modalExerciseName.textContent = exercise.name;
+  setsContainer.innerHTML = "";
+
+  const lastDefaultWorkout = getWorkoutHistory()
+    .slice()
+    .reverse()
+    .find((record) =>
+      record.exerciseId === exercise.exerciseId &&
+      record.useAsNextDefault === true &&
+      Array.isArray(record.sets)
+    );
+
+  if (lastDefaultWorkout) {
+    lastDefaultWorkout.sets.forEach((set) => addSet(set.weight, set.reps));
+  } else {
+    for (let index = 0; index < exercise.defaultSets; index++) {
+      addSet(exercise.defaultWeight ?? "", exercise.defaultReps);
+    }
+  }
+
+  setRestTimer(lastDefaultWorkout?.restTime ?? exercise.defaultRestTime);
+  useAsNextDefault.checked = true;
+  modal.classList.add("show");
+}
+
+workoutSection.addEventListener("click", (event) => {
+  const button = event.target.closest(".start-btn");
+  if (button) openWorkoutModal(button.dataset.exerciseId);
+});
+
+closeModalButton.addEventListener("click", () => {
+  modal.classList.remove("show");
+});
+
+addSetBtn.addEventListener("click", () => addSet());
 
 saveWorkoutBtn.addEventListener("click", () => {
+  const exercise = EXERCISE_BY_ID.get(activeExerciseId);
+  if (!exercise) return;
 
-  const exercise = modalExerciseName.textContent;
+  const sets = Array.from(setsContainer.querySelectorAll(".set-row")).map((row) => ({
+    weight: toFiniteNumber(row.querySelector(".set-weight").value),
+    reps: toFiniteNumber(row.querySelector(".set-reps").value)
+  }));
 
-  const setRows =
-    setsContainer.querySelectorAll(".set-row");
-
-  const sets = [];
-
-  setRows.forEach((row) => {
-
-    const weight =
-      row.querySelector(".set-weight").value;
-
-    const reps =
-      row.querySelector(".set-reps").value;
-
-    sets.push({
-      weight: weight,
-      reps: reps
-    });
-
-  });
-
-  const useAsNextDefault =
-    document.getElementById("useAsNextDefault");
-
-    const workoutRecord = {
-      exercise: exercise,
-      sets: sets,
-      restTime: Number(restTimeInput.value),
-      date: new Date().toLocaleDateString(),
-      useAsNextDefault: useAsNextDefault.checked
-    };
-
-  const workoutHistory =
-    JSON.parse(localStorage.getItem("workoutHistory")) || [];
-
-  workoutHistory.push(workoutRecord);
-
-  localStorage.setItem(
-    "workoutHistory",
-    JSON.stringify(workoutHistory)
-  );
-
-  renderHistory();
-
-  renderExerciseChart();
-
-  alert("Workout saved!");
-
-  modal.classList.remove("show");
-
-});
-
-const historyList = document.getElementById("historyList");
-
-function renderHistory() {
-
-  const workoutHistory =
-    JSON.parse(localStorage.getItem("workoutHistory")) || [];
-
-  historyList.innerHTML = "";
-
-  workoutHistory
-  .slice()
-  .reverse()
-  .forEach((record, index) => {
-
-    const historyItem = document.createElement("div");
-
-    historyItem.className = "history-item";
-
-    let setsHtml = "";
-
-    if (Array.isArray(record.sets)) {
-    
-      setsHtml = record.sets
-        .map((set, index) => {
-          return `
-            <div>
-              Set ${index + 1}：
-              ${set.weight}kg × ${set.reps} reps
-            </div>
-          `;
-        })
-        .join("");
-    
-    } else {
-    
-      setsHtml = `
-        <div>
-          旧形式のWorkout記録
-        </div>
-      `;
-    
-    }
-
-historyItem.innerHTML = `
-  <strong>${record.exercise}</strong>
-
-  <div class="history-sets">
-    ${setsHtml}
-  </div>
-
-  <div class="history-date">
-    ${record.date}
-  </div>
-
-  <button class="delete-history-btn">
-    Delete
-  </button>
-`;
-
-    const deleteButton =
-      historyItem.querySelector(".delete-history-btn");
-
-    deleteButton.addEventListener("click", () => {
-
-      const originalIndex =
-        workoutHistory.length - 1 - index;
-
-      workoutHistory.splice(originalIndex, 1);
-
-      localStorage.setItem(
-        "workoutHistory",
-        JSON.stringify(workoutHistory)
-      );
-
-      renderHistory();
-
-    });
-
-    historyList.appendChild(historyItem);
-
-  });
-
-}
-
-renderHistory();
-
-const currentWeight =
-  document.getElementById("currentWeight");
-
-const bodyWeightInput =
-  document.getElementById("bodyWeightInput");
-
-const saveWeightBtn =
-  document.getElementById("saveWeightBtn");
-
-
-function loadCurrentWeight() {
-
-  const weightHistory =
-    JSON.parse(localStorage.getItem("bodyWeightHistory")) || [];
-
-  if (weightHistory.length === 0) {
-    return;
-  }
-
-  const latestWeight =
-    weightHistory[weightHistory.length - 1];
-
-  currentWeight.textContent =
-    latestWeight.weight;
-}
-
-
-saveWeightBtn.addEventListener("click", () => {
-
-  const weight =
-    bodyWeightInput.value;
-
-  if (weight === "") {
-    alert("体重を入力してください");
-    return;
-  }
-
-  const weightHistory =
-    JSON.parse(localStorage.getItem("bodyWeightHistory")) || [];
-
-  const weightRecord = {
-    weight: Number(weight),
-    date: new Date().toLocaleDateString()
+  const timestamp = createTimestamp();
+  const workoutRecord = {
+    recordId: createId("record"),
+    exerciseId: exercise.exerciseId,
+    exercise: exercise.name,
+    sets,
+    restTime: toFiniteNumber(restTimeInput.value, exercise.defaultRestTime),
+    date: timestamp.date,
+    createdAt: timestamp.createdAt,
+    useAsNextDefault: useAsNextDefault.checked
   };
 
-  weightHistory.push(weightRecord);
+  const workoutHistory = getWorkoutHistory();
+  workoutHistory.push(workoutRecord);
 
-  localStorage.setItem(
-    "bodyWeightHistory",
-    JSON.stringify(weightHistory)
-  );
+  if (!saveWorkoutHistory(workoutHistory)) {
+    alert("Workoutを保存できませんでした。");
+    return;
+  }
 
-  currentWeight.textContent = weight;
-
-bodyWeightInput.value = "";
-
-renderWeightChart();
-
-alert("体重を記録しました！");
+  renderHistory();
+  renderExerciseChart();
+  alert("Workout saved!");
+  modal.classList.remove("show");
 });
 
+function renderHistory() {
+  const workoutHistory = getWorkoutHistory();
+  historyList.innerHTML = "";
 
-loadCurrentWeight();
+  workoutHistory.slice().reverse().forEach((record) => {
+    const historyItem = document.createElement("div");
+    historyItem.className = "history-item";
 
-const workoutTimerDisplay =
-  document.getElementById("workoutTimerDisplay");
+    const exerciseName = document.createElement("strong");
+    exerciseName.textContent = record.exercise;
 
-const workoutType =
-  document.getElementById("workoutType");  
+    const setsElement = document.createElement("div");
+    setsElement.className = "history-sets";
 
-const startWorkoutBtn =
-  document.getElementById("startWorkoutBtn");
+    if (Array.isArray(record.sets)) {
+      record.sets.forEach((set, index) => {
+        const setElement = document.createElement("div");
+        setElement.textContent = `Set ${index + 1}： ${set.weight}kg × ${set.reps} reps`;
+        setsElement.appendChild(setElement);
+      });
+    } else {
+      setsElement.textContent = "旧形式のWorkout記録";
+    }
 
-const finishWorkoutBtn =
-  document.getElementById("finishWorkoutBtn");
+    const dateElement = document.createElement("div");
+    dateElement.className = "history-date";
+    dateElement.textContent = record.date || "";
+
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "delete-history-btn";
+    deleteButton.type = "button";
+    deleteButton.textContent = "Delete";
+    deleteButton.addEventListener("click", () => {
+      const updatedHistory = workoutHistory.filter(
+        (item) => item.recordId !== record.recordId
+      );
+      saveWorkoutHistory(updatedHistory);
+      renderHistory();
+      renderExerciseChart();
+    });
+
+    historyItem.append(exerciseName, setsElement, dateElement, deleteButton);
+    historyList.appendChild(historyItem);
+  });
+}
+
+// ============================================================
+// Workout全体タイマー・Session履歴
+// ============================================================
 
 let workoutTimerInterval = null;
 let workoutSeconds = 0;
 let workoutRunning = false;
 
-function updateWorkoutTimerDisplay() {
-
-  const hours =
-    Math.floor(workoutSeconds / 3600);
-
-  const minutes =
-    Math.floor((workoutSeconds % 3600) / 60);
-
-  const seconds =
-    workoutSeconds % 60;
-
-  workoutTimerDisplay.textContent =
-    `${String(hours).padStart(2, "0")}:` +
+function formatWorkoutDuration(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(hours).padStart(2, "0")}:` +
     `${String(minutes).padStart(2, "0")}:` +
     `${String(seconds).padStart(2, "0")}`;
 }
 
-startWorkoutBtn.addEventListener("click", () => {
+function updateWorkoutTimerDisplay() {
+  workoutTimerDisplay.textContent = formatWorkoutDuration(workoutSeconds);
+}
 
-  if (workoutRunning) {
-    return;
-  }
+startWorkoutBtn.addEventListener("click", () => {
+  if (workoutRunning) return;
 
   workoutRunning = true;
-
   workoutTimerInterval = setInterval(() => {
-
     workoutSeconds++;
-
     updateWorkoutTimerDisplay();
-
   }, 1000);
-
 });
 
 finishWorkoutBtn.addEventListener("click", () => {
-
-  if (!workoutRunning) {
-    return;
-  }
+  if (!workoutRunning) return;
 
   clearInterval(workoutTimerInterval);
-
   workoutTimerInterval = null;
   workoutRunning = false;
 
-  const workoutSessions =
-    JSON.parse(localStorage.getItem("workoutSessions")) || [];
-
+  const timestamp = createTimestamp();
   const sessionRecord = {
+    sessionId: createId("session"),
     type: workoutType.value,
     duration: workoutSeconds,
-    date: new Date().toLocaleDateString()
+    date: timestamp.date,
+    createdAt: timestamp.createdAt
   };
 
+  const workoutSessions = getWorkoutSessions();
   workoutSessions.push(sessionRecord);
 
-  localStorage.setItem(
-    "workoutSessions",
-    JSON.stringify(workoutSessions)
-  );
-
-  renderSessionHistory();
-
-  alert(
-    `${workoutType.value} workout saved!\n` +
-    `Time: ${workoutTimerDisplay.textContent}`
-  );
-
-  workoutSeconds = 0;
-
-  updateWorkoutTimerDisplay();
-
-});
-
-
-const sessionHistoryList =
-  document.getElementById("sessionHistoryList");
-
-
-function formatWorkoutDuration(totalSeconds) {
-
-  const hours =
-    Math.floor(totalSeconds / 3600);
-
-  const minutes =
-    Math.floor((totalSeconds % 3600) / 60);
-
-  const seconds =
-    totalSeconds % 60;
-
-  return (
-    `${String(hours).padStart(2, "0")}:` +
-    `${String(minutes).padStart(2, "0")}:` +
-    `${String(seconds).padStart(2, "0")}`
-  );
-}
-
-
-function renderSessionHistory() {
-
-  const workoutSessionHistory =
-  JSON.parse(
-    localStorage.getItem("workoutSessions")
-  ) || [];
-
-  sessionHistoryList.innerHTML = "";
-
-  if (workoutSessionHistory.length === 0) {
-
-    sessionHistoryList.textContent =
-      "No workout sessions yet.";
-
+  if (!saveWorkoutSessions(workoutSessions)) {
+    alert("Workout Sessionを保存できませんでした。");
     return;
   }
 
-  workoutSessionHistory
-    .slice()
-    .reverse()
-    .forEach((session) => {
-
-      const sessionItem =
-        document.createElement("div");
-
-      sessionItem.className =
-        "session-history-item";
-
-      sessionItem.innerHTML = `
-        <strong>${session.type}</strong>
-
-        <div>
-          ${formatWorkoutDuration(session.duration)}
-        </div>
-
-        <div>
-          ${session.date}
-        </div>
-      `;
-
-      sessionHistoryList.appendChild(
-        sessionItem
-      );
-
-    });
-
-}
-
-
-renderSessionHistory();
-
-const weightChartCanvas =
-  document.getElementById("weightChart");
-
-let weightChart = null;
-
-
-function renderWeightChart() {
-
-  const weightHistory =
-    JSON.parse(
-      localStorage.getItem("bodyWeightHistory")
-    ) || [];
-
-  const labels =
-    weightHistory.map((record) => record.date);
-
-  const weights =
-    weightHistory.map((record) => record.weight);
-
-
-  if (weightChart) {
-    weightChart.destroy();
-  }
-
-
-  weightChart = new Chart(
-    weightChartCanvas,
-    {
-      type: "line",
-
-      data: {
-        labels: labels,
-
-        datasets: [
-          {
-            label: "Body Weight (kg)",
-            data: weights,
-            tension: 0.3
-          }
-        ]
-      },
-
-      options: {
-        responsive: true,
-
-        plugins: {
-          legend: {
-            display: true
-          }
-        },
-
-        scales: {
-          y: {
-            beginAtZero: false
-          }
-        }
-      }
-    }
-  );
-
-}
-
-
-renderWeightChart();
-
-const exerciseChartSelect =
-  document.getElementById("exerciseChartSelect");
-
-const exerciseChartCanvas =
-  document.getElementById("exerciseChart");
-
-let exerciseChart = null;
-
-
-// 種目一覧を自動で追加
-Object.keys(exerciseDefaults).forEach((exercise) => {
-
-  const option =
-    document.createElement("option");
-
-  option.value = exercise;
-  option.textContent = exercise;
-
-  exerciseChartSelect.appendChild(option);
-
+  renderSessionHistory();
+  alert(`${workoutType.value} workout saved!\nTime: ${workoutTimerDisplay.textContent}`);
+  workoutSeconds = 0;
+  updateWorkoutTimerDisplay();
 });
 
+function renderSessionHistory() {
+  const workoutSessions = getWorkoutSessions();
+  sessionHistoryList.innerHTML = "";
 
-// 最初はBench Press
-exerciseChartSelect.value = "Bench Press";
-
-
-function renderExerciseChart() {
-
-  const selectedExercise =
-    exerciseChartSelect.value;
-
-  const workoutHistory =
-    JSON.parse(
-      localStorage.getItem("workoutHistory")
-    ) || [];
-
-
-  const exerciseHistory =
-    workoutHistory.filter((record) =>
-      record.exercise === selectedExercise &&
-      Array.isArray(record.sets)
-    );
-
-
-    const labels = [];
-
-    const weights = [];
-    
-    const estimated1RMs = [];
-
-
-    exerciseHistory.forEach((record) => {
-
-      const validSets =
-        record.sets
-          .map((set) => {
-            return {
-              weight: Number(set.weight),
-              reps: Number(set.reps)
-            };
-          })
-          .filter((set) =>
-            !Number.isNaN(set.weight) &&
-            !Number.isNaN(set.reps) &&
-            set.weight > 0 &&
-            set.reps > 0
-          );
-    
-    
-      if (validSets.length === 0) {
-        return;
-      }
-    
-    
-      const maxWeight =
-        Math.max(
-          ...validSets.map((set) => set.weight)
-        );
-    
-    
-      const setEstimated1RMs =
-        validSets.map((set) => {
-    
-          return (
-            set.weight *
-            (1 + set.reps / 30)
-          );
-    
-        });
-    
-    
-      const maxEstimated1RM =
-        Math.max(...setEstimated1RMs);
-    
-    
-      labels.push(record.date);
-    
-      weights.push(maxWeight);
-    
-      estimated1RMs.push(
-        Number(maxEstimated1RM.toFixed(1))
-      );
-    
-    });
-
-
-  if (exerciseChart) {
-    exerciseChart.destroy();
+  if (workoutSessions.length === 0) {
+    sessionHistoryList.textContent = "No workout sessions yet.";
+    return;
   }
 
+  workoutSessions.slice().reverse().forEach((session) => {
+    const sessionItem = document.createElement("div");
+    sessionItem.className = "session-history-item";
 
-  exerciseChart = new Chart(
-    exerciseChartCanvas,
-    {
-      type: "line",
+    const type = document.createElement("strong");
+    type.textContent = session.type;
+    const duration = document.createElement("div");
+    duration.textContent = formatWorkoutDuration(session.duration);
+    const date = document.createElement("div");
+    date.textContent = session.date || "";
 
-      data: {
-        labels: labels,
-
-        datasets: [
-          {
-            label: "Max Weight (kg)",
-            data: weights,
-            tension: 0.3
-          },
-        
-          {
-            label: "Estimated 1RM (kg)",
-            data: estimated1RMs,
-            tension: 0.3
-          }
-        ]
-      },
-
-      options: {
-        responsive: true,
-
-        scales: {
-          y: {
-            beginAtZero: false
-          }
-        }
-      }
-    }
-  );
-
+    sessionItem.append(type, duration, date);
+    sessionHistoryList.appendChild(sessionItem);
+  });
 }
 
+// ============================================================
+// 体重記録
+// ============================================================
 
-exerciseChartSelect.addEventListener(
-  "change",
-  renderExerciseChart
-);
+function loadCurrentWeight() {
+  const weightHistory = getBodyWeightHistory();
+  if (weightHistory.length > 0) {
+    currentWeight.textContent = weightHistory[weightHistory.length - 1].weight;
+  }
+}
 
+saveWeightBtn.addEventListener("click", () => {
+  if (bodyWeightInput.value === "") {
+    alert("体重を入力してください");
+    return;
+  }
 
-renderExerciseChart();
+  const timestamp = createTimestamp();
+  const weightRecord = {
+    weight: toFiniteNumber(bodyWeightInput.value),
+    date: timestamp.date,
+    createdAt: timestamp.createdAt
+  };
+
+  const weightHistory = getBodyWeightHistory();
+  weightHistory.push(weightRecord);
+
+  if (!saveBodyWeightHistory(weightHistory)) {
+    alert("体重を保存できませんでした。");
+    return;
+  }
+
+  currentWeight.textContent = weightRecord.weight;
+  bodyWeightInput.value = "";
+  renderWeightChart();
+  alert("体重を記録しました！");
+});
+
+// ============================================================
+// グラフ
+// ============================================================
+
+let weightChart = null;
+let exerciseChart = null;
+
+function canRenderCharts() {
+  if (typeof Chart === "undefined") {
+    console.warn("Chart.js is not available.");
+    return false;
+  }
+  return true;
+}
+
+function renderWeightChart() {
+  if (!canRenderCharts()) return;
+
+  const weightHistory = getBodyWeightHistory();
+  if (weightChart) weightChart.destroy();
+
+  weightChart = new Chart(weightChartCanvas, {
+    type: "line",
+    data: {
+      labels: weightHistory.map((record) => record.date),
+      datasets: [{
+        label: "Body Weight (kg)",
+        data: weightHistory.map((record) => record.weight),
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: true } },
+      scales: { y: { beginAtZero: false } }
+    }
+  });
+}
+
+function populateExerciseChartSelect() {
+  exerciseChartSelect.innerHTML = "";
+  EXERCISES.forEach((exercise) => {
+    const option = document.createElement("option");
+    option.value = exercise.exerciseId;
+    option.textContent = exercise.name;
+    exerciseChartSelect.appendChild(option);
+  });
+  exerciseChartSelect.value = "push-bench-press";
+}
+
+function renderExerciseChart() {
+  if (!canRenderCharts()) return;
+
+  const selectedExerciseId = exerciseChartSelect.value;
+  const exerciseHistory = getWorkoutHistory().filter((record) =>
+    record.exerciseId === selectedExerciseId && Array.isArray(record.sets)
+  );
+  const labels = [];
+  const weights = [];
+  const estimated1RMs = [];
+
+  exerciseHistory.forEach((record) => {
+    const validSets = record.sets.filter((set) =>
+      Number.isFinite(set.weight) && Number.isFinite(set.reps) &&
+      set.weight > 0 && set.reps > 0
+    );
+    if (validSets.length === 0) return;
+
+    labels.push(record.date);
+    weights.push(Math.max(...validSets.map((set) => set.weight)));
+    estimated1RMs.push(Number(Math.max(
+      ...validSets.map((set) => set.weight * (1 + set.reps / 30))
+    ).toFixed(1)));
+  });
+
+  if (exerciseChart) exerciseChart.destroy();
+
+  exerciseChart = new Chart(exerciseChartCanvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "Max Weight (kg)", data: weights, tension: 0.3 },
+        { label: "Estimated 1RM (kg)", data: estimated1RMs, tension: 0.3 }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: { y: { beginAtZero: false } }
+    }
+  });
+}
+
+exerciseChartSelect.addEventListener("change", renderExerciseChart);
+
+// ============================================================
+// 初期化
+// ============================================================
+
+function initializeApp() {
+  renderExerciseCards();
+  populateExerciseChartSelect();
+  renderHistory();
+  renderSessionHistory();
+  loadCurrentWeight();
+  renderWeightChart();
+  renderExerciseChart();
+  updateWorkoutTimerDisplay();
+  updateRestTimerDisplay();
+}
+
+initializeApp();
