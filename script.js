@@ -215,11 +215,13 @@ const progressBest1RM = document.getElementById("progressBest1RM");
 const bodyWeightChangeText = document.getElementById("bodyWeightChangeText");
 const weightChartContainer = document.getElementById("weightChartContainer");
 const weightChartEmpty = document.getElementById("weightChartEmpty");
+const weightChartUnavailable = document.getElementById("weightChartUnavailable");
 const strengthBestWeight = document.getElementById("strengthBestWeight");
 const strengthBest1RM = document.getElementById("strengthBest1RM");
 const strengthRecordCount = document.getElementById("strengthRecordCount");
 const exerciseChartContainer = document.getElementById("exerciseChartContainer");
 const strengthChartEmpty = document.getElementById("strengthChartEmpty");
+const strengthChartUnavailable = document.getElementById("strengthChartUnavailable");
 const activeWorkoutStatus = document.getElementById("activeWorkoutStatus");
 const activeWorkoutTitle = document.getElementById("activeWorkoutTitle");
 const activeWorkoutExerciseCount = document.getElementById("activeWorkoutExerciseCount");
@@ -1022,19 +1024,31 @@ function refreshProgressCharts() {
   if (weightChartNeedsUpdate || !weightChart) {
     renderWeightChart();
   } else {
-    weightChart.resize();
+    try {
+      weightChart.resize();
+    } catch (error) {
+      console.error("Failed to resize Body Weight chart", error);
+      weightChartNeedsUpdate = true;
+      renderWeightChart();
+    }
   }
 
   if (exerciseChartNeedsUpdate || !exerciseChart) {
     renderExerciseChart();
   } else {
-    exerciseChart.resize();
+    try {
+      exerciseChart.resize();
+    } catch (error) {
+      console.error("Failed to resize Strength Progress chart", error);
+      exerciseChartNeedsUpdate = true;
+      renderExerciseChart();
+    }
   }
 }
 
 function canRenderCharts() {
   if (typeof Chart === "undefined") {
-    console.warn("Chart.js is not available.");
+    console.error("Chart.js is not available.");
     return false;
   }
   return true;
@@ -1143,37 +1157,55 @@ function renderWeightChart() {
   const hasWeightData = weightHistory.length > 0;
   weightChartContainer.hidden = !hasWeightData;
   weightChartEmpty.hidden = hasWeightData;
+  weightChartUnavailable.hidden = true;
 
   if (!hasWeightData) {
-    if (weightChart) {
-      weightChart.destroy();
+    try {
+      if (weightChart) weightChart.destroy();
+    } catch (error) {
+      console.error("Failed to destroy Body Weight chart", error);
+    } finally {
       weightChart = null;
     }
     weightChartNeedsUpdate = false;
     return;
   }
 
-  if (!canRenderCharts()) return;
-  if (weightChart) weightChart.destroy();
+  if (!canRenderCharts()) {
+    weightChartContainer.hidden = true;
+    weightChartUnavailable.hidden = false;
+    weightChartNeedsUpdate = false;
+    return;
+  }
 
-  weightChart = new Chart(weightChartCanvas, {
-    type: "line",
-    data: {
-      labels: weightHistory.map((record) => record.date),
-      datasets: [{
-        label: "Body Weight (kg)",
-        data: weightHistory.map((record) => record.weight),
-        tension: 0.3
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: true } },
-      scales: { y: { beginAtZero: false } }
-    }
-  });
-  weightChartNeedsUpdate = false;
+  try {
+    if (weightChart) weightChart.destroy();
+    weightChart = new Chart(weightChartCanvas, {
+      type: "line",
+      data: {
+        labels: weightHistory.map((record) => record.date),
+        datasets: [{
+          label: "Body Weight (kg)",
+          data: weightHistory.map((record) => record.weight),
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: true } },
+        scales: { y: { beginAtZero: false } }
+      }
+    });
+    weightChartContainer.hidden = false;
+    weightChartNeedsUpdate = false;
+  } catch (error) {
+    console.error("Failed to render Body Weight chart", error);
+    weightChart = null;
+    weightChartContainer.hidden = true;
+    weightChartUnavailable.hidden = false;
+    weightChartNeedsUpdate = false;
+  }
 }
 
 function populateExerciseChartSelect() {
@@ -1205,43 +1237,61 @@ function renderExerciseChart() {
   strengthRecordCount.textContent = progress.recordCount;
   exerciseChartContainer.hidden = !hasStrengthData;
   strengthChartEmpty.hidden = hasStrengthData;
+  strengthChartUnavailable.hidden = true;
 
   if (!hasStrengthData) {
-    if (exerciseChart) {
-      exerciseChart.destroy();
+    try {
+      if (exerciseChart) exerciseChart.destroy();
+    } catch (error) {
+      console.error("Failed to destroy Strength Progress chart", error);
+    } finally {
       exerciseChart = null;
     }
     exerciseChartNeedsUpdate = false;
     return;
   }
 
-  if (!canRenderCharts()) return;
+  if (!canRenderCharts()) {
+    exerciseChartContainer.hidden = true;
+    strengthChartUnavailable.hidden = false;
+    exerciseChartNeedsUpdate = false;
+    return;
+  }
 
-  if (exerciseChart) exerciseChart.destroy();
-  exerciseChart = new Chart(exerciseChartCanvas, {
-    type: "line",
-    data: {
-      labels: progress.chartRecords.map((record) => record.date),
-      datasets: [
-        {
-          label: "Max Weight (kg)",
-          data: progress.chartRecords.map((record) => record.maxWeight),
-          tension: 0.3
-        },
-        {
-          label: "Estimated 1RM (kg)",
-          data: progress.chartRecords.map((record) => record.estimated1RM),
-          tension: 0.3
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: { y: { beginAtZero: false } }
-    }
-  });
-  exerciseChartNeedsUpdate = false;
+  try {
+    if (exerciseChart) exerciseChart.destroy();
+    exerciseChart = new Chart(exerciseChartCanvas, {
+      type: "line",
+      data: {
+        labels: progress.chartRecords.map((record) => record.date),
+        datasets: [
+          {
+            label: "Max Weight (kg)",
+            data: progress.chartRecords.map((record) => record.maxWeight),
+            tension: 0.3
+          },
+          {
+            label: "Estimated 1RM (kg)",
+            data: progress.chartRecords.map((record) => record.estimated1RM),
+            tension: 0.3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { beginAtZero: false } }
+      }
+    });
+    exerciseChartContainer.hidden = false;
+    exerciseChartNeedsUpdate = false;
+  } catch (error) {
+    console.error("Failed to render Strength Progress chart", error);
+    exerciseChart = null;
+    exerciseChartContainer.hidden = true;
+    strengthChartUnavailable.hidden = false;
+    exerciseChartNeedsUpdate = false;
+  }
 }
 
 exerciseChartSelect.addEventListener("change", markExerciseChartForUpdate);

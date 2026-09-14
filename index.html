@@ -93,6 +93,10 @@
           <strong>No weight data yet</strong>
           <span>Record your first body weight to start tracking progress.</span>
         </div>
+        <div id="weightChartUnavailable" class="progress-empty-state" hidden>
+          <strong>Chart unavailable</strong>
+          <span>Unable to load the chart right now.</span>
+        </div>
         <div id="weightChartContainer" class="chart-container" hidden>
           <canvas id="weightChart"></canvas>
         </div>
@@ -119,6 +123,10 @@
         <div id="strengthChartEmpty" class="progress-empty-state">
           <strong>No strength data yet</strong>
           <span>Complete this exercise in a workout to see progress.</span>
+        </div>
+        <div id="strengthChartUnavailable" class="progress-empty-state" hidden>
+          <strong>Chart unavailable</strong>
+          <span>Unable to load the chart right now.</span>
         </div>
         <div id="exerciseChartContainer" class="chart-container" hidden>
           <canvas id="exerciseChart"></canvas>
@@ -195,7 +203,7 @@
   
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
