@@ -566,57 +566,146 @@ function restoreActiveWorkout() {
   startWorkoutTimer();
 }
 
+const expandedHistorySessions = new Set();
+
+function getSessionSortTime(session) {
+  const startedAtTime = Date.parse(session.startedAt);
+  if (Number.isFinite(startedAtTime)) return startedAtTime;
+
+  const dateTime = Date.parse(session.date);
+  return Number.isFinite(dateTime) ? dateTime : 0;
+}
+
+function formatHistoryDate(session) {
+  const timestamp = getSessionSortTime(session);
+  if (timestamp === 0) return session.date || "Unknown date";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  }).format(new Date(timestamp));
+}
+
+function formatHistoryDuration(totalSeconds) {
+  const seconds = Math.max(0, Math.floor(toFiniteNumber(totalSeconds)));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+
+  if (hours > 0) return `${hours}h ${String(minutes).padStart(2, "0")}m`;
+  if (minutes > 0) return `${minutes}m`;
+  return "<1m";
+}
+
+function formatHistorySet(set) {
+  const weight = toFiniteNumber(set.weight);
+  const reps = toFiniteNumber(set.reps);
+  return weight > 0 ? `${weight} kg × ${reps} reps` : `${reps} reps`;
+}
+
 function renderSessionHistory() {
-  const workoutSessions = getWorkoutSessions();
+  const workoutSessions = getWorkoutSessions().sort(
+    (left, right) => getSessionSortTime(right) - getSessionSortTime(left)
+  );
   sessionHistoryList.innerHTML = "";
 
   if (workoutSessions.length === 0) {
-    sessionHistoryList.textContent = "No workout sessions yet.";
+    const emptyState = document.createElement("div");
+    emptyState.className = "history-empty-state";
+
+    const title = document.createElement("h3");
+    title.textContent = "No workouts yet";
+    const message = document.createElement("p");
+    message.textContent = "Complete a workout and it will appear here.";
+
+    emptyState.append(title, message);
+    sessionHistoryList.appendChild(emptyState);
     return;
   }
 
-  workoutSessions.slice().reverse().forEach((session) => {
-    const sessionItem = document.createElement("div");
-    sessionItem.className = "session-history-item";
+  workoutSessions.forEach((session, sessionIndex) => {
+    const sessionItem = document.createElement("article");
+    sessionItem.className = "history-session-card";
 
-    const heading = document.createElement("strong");
-    heading.textContent = `${session.date} - ${session.type}`;
+    const detailsId = `session-details-${sessionIndex}`;
+    const isExpanded = expandedHistorySessions.has(session.sessionId);
+    sessionItem.classList.toggle("expanded", isExpanded);
 
-    const duration = document.createElement("div");
-    duration.textContent = `Time: ${formatWorkoutDuration(session.duration)}`;
+    const summaryButton = document.createElement("button");
+    summaryButton.className = "history-session-summary";
+    summaryButton.type = "button";
+    summaryButton.setAttribute("aria-expanded", String(isExpanded));
+    summaryButton.setAttribute("aria-controls", detailsId);
 
-    const exerciseCount = document.createElement("div");
+    const date = document.createElement("span");
+    date.className = "history-session-date";
+    date.textContent = formatHistoryDate(session);
+
+    const badge = document.createElement("span");
+    badge.className = `history-type-badge history-type-${session.type.toLowerCase()}`;
+    badge.textContent = session.type.toUpperCase();
+
+    const meta = document.createElement("span");
+    meta.className = "history-session-meta";
+    const duration = document.createElement("span");
+    duration.textContent = formatHistoryDuration(session.duration);
+    const exerciseCount = document.createElement("span");
     exerciseCount.textContent =
       `${session.exercises.length} ${session.exercises.length === 1 ? "exercise" : "exercises"}`;
+    meta.append(duration, exerciseCount);
 
-    const exercises = document.createElement("div");
+    const chevron = document.createElement("span");
+    chevron.className = "history-chevron";
+    chevron.setAttribute("aria-hidden", "true");
+    chevron.textContent = "⌄";
+    summaryButton.append(date, badge, meta, chevron);
+
+    const details = document.createElement("div");
+    details.id = detailsId;
+    details.className = "history-session-details";
+    details.hidden = !isExpanded;
+
     session.exercises.forEach((record) => {
-      const exerciseBlock = document.createElement("div");
-      exerciseBlock.className = "history-item";
+      const exerciseBlock = document.createElement("section");
+      exerciseBlock.className = "history-exercise";
 
-      const exerciseName = document.createElement("strong");
+      const exerciseName = document.createElement("h3");
       exerciseName.textContent = record.exercise;
       exerciseBlock.appendChild(exerciseName);
 
       record.sets.forEach((set, index) => {
         const setElement = document.createElement("div");
-        setElement.textContent = `Set ${index + 1}： ${set.weight}kg × ${set.reps} reps`;
+        setElement.className = "history-set-row";
+
+        const setNumber = document.createElement("span");
+        setNumber.className = "history-set-number";
+        setNumber.textContent = `Set ${index + 1}`;
+        const setResult = document.createElement("span");
+        setResult.className = "history-set-result";
+        setResult.textContent = formatHistorySet(set);
+
+        setElement.append(setNumber, setResult);
         exerciseBlock.appendChild(setElement);
       });
 
-      exercises.appendChild(exerciseBlock);
+      details.appendChild(exerciseBlock);
     });
 
     const deleteButton = document.createElement("button");
-    deleteButton.className = "delete-history-btn";
+    deleteButton.className = "delete-history-btn history-session-delete";
     deleteButton.type = "button";
-    deleteButton.textContent = "Delete";
-    deleteButton.addEventListener("click", () => {
+    deleteButton.textContent = "Delete workout";
+    deleteButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const shouldDelete = confirm("このWorkout Sessionを削除しますか？");
+      if (!shouldDelete) return;
+
       const updatedSessions = workoutSessions.filter(
         (item) => item.sessionId !== session.sessionId
       );
 
       if (saveWorkoutSessions(updatedSessions)) {
+        expandedHistorySessions.delete(session.sessionId);
         renderSessionHistory();
         markExerciseChartForUpdate();
       } else {
@@ -624,7 +713,21 @@ function renderSessionHistory() {
       }
     });
 
-    sessionItem.append(heading, duration, exerciseCount, exercises, deleteButton);
+    summaryButton.addEventListener("click", () => {
+      const willExpand = details.hidden;
+      details.hidden = !willExpand;
+      sessionItem.classList.toggle("expanded", willExpand);
+      summaryButton.setAttribute("aria-expanded", String(willExpand));
+
+      if (willExpand) {
+        expandedHistorySessions.add(session.sessionId);
+      } else {
+        expandedHistorySessions.delete(session.sessionId);
+      }
+    });
+
+    details.appendChild(deleteButton);
+    sessionItem.append(summaryButton, details);
     sessionHistoryList.appendChild(sessionItem);
   });
 }
