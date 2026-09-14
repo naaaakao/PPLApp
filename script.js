@@ -367,6 +367,9 @@ function updateSetNumbers() {
 
 let restTimerInterval = null;
 let restSecondsRemaining = 90;
+let restTimerEndsAt = null;
+let restTimerExerciseId = null;
+let restTimerCompletionNotified = false;
 
 function updateRestTimerDisplay() {
   const minutes = Math.floor(restSecondsRemaining / 60);
@@ -375,34 +378,71 @@ function updateRestTimerDisplay() {
     `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function setRestTimer(seconds) {
+function stopRestTimer() {
   clearInterval(restTimerInterval);
   restTimerInterval = null;
+  restTimerEndsAt = null;
+}
+
+function setRestTimer(seconds, exerciseId = activeExerciseId) {
+  stopRestTimer();
   restSecondsRemaining = Math.max(0, toFiniteNumber(seconds, 90));
+  restTimerExerciseId = exerciseId;
+  restTimerCompletionNotified = false;
   restTimeInput.value = restSecondsRemaining;
   updateRestTimerDisplay();
 }
 
-startRestBtn.addEventListener("click", () => {
-  clearInterval(restTimerInterval);
-  restSecondsRemaining = Math.max(0, toFiniteNumber(restTimeInput.value));
+function updateRestTimerFromClock() {
+  if (restTimerEndsAt === null) {
+    updateRestTimerDisplay();
+    return;
+  }
+
+  restSecondsRemaining = Math.max(
+    0,
+    Math.ceil((restTimerEndsAt - Date.now()) / 1000)
+  );
   updateRestTimerDisplay();
 
-  if (restSecondsRemaining === 0) return;
+  if (restSecondsRemaining > 0) return;
 
-  restTimerInterval = setInterval(() => {
-    restSecondsRemaining--;
+  stopRestTimer();
+  if (!restTimerCompletionNotified) {
+    restTimerCompletionNotified = true;
+    alert("休憩終了！");
+  }
+}
+
+function startRestTimer() {
+  stopRestTimer();
+  const configuredSeconds = Math.max(0, toFiniteNumber(restTimeInput.value));
+  restSecondsRemaining = configuredSeconds;
+  restTimerExerciseId = activeExerciseId;
+  restTimerCompletionNotified = false;
+
+  if (configuredSeconds === 0) {
     updateRestTimerDisplay();
+    return;
+  }
 
-    if (restSecondsRemaining <= 0) {
-      clearInterval(restTimerInterval);
-      restTimerInterval = null;
-      alert("休憩終了！");
-    }
-  }, 1000);
+  restTimerEndsAt = Date.now() + configuredSeconds * 1000;
+  updateRestTimerFromClock();
+  restTimerInterval = setInterval(updateRestTimerFromClock, 250);
+}
+
+function resetRestTimer() {
+  setRestTimer(restTimeInput.value, activeExerciseId);
+}
+
+startRestBtn.addEventListener("click", startRestTimer);
+resetRestBtn.addEventListener("click", resetRestTimer);
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) updateRestTimerFromClock();
 });
 
-resetRestBtn.addEventListener("click", () => setRestTimer(restTimeInput.value));
+window.addEventListener("focus", updateRestTimerFromClock);
 
 // ============================================================
 // Workout種目記録
@@ -429,6 +469,8 @@ function openWorkoutModal(exerciseId) {
   const exercise = EXERCISE_BY_ID.get(exerciseId);
   if (!exercise) return;
 
+  const shouldKeepRunningRestTimer =
+    restTimerEndsAt !== null && restTimerExerciseId === exercise.exerciseId;
   activeExerciseId = exercise.exerciseId;
   modalExerciseName.textContent = exercise.name;
   setsContainer.innerHTML = "";
@@ -446,7 +488,11 @@ function openWorkoutModal(exerciseId) {
     }
   }
 
-  setRestTimer(defaultRecord?.restTime ?? exercise.defaultRestTime);
+  if (shouldKeepRunningRestTimer) {
+    updateRestTimerFromClock();
+  } else {
+    setRestTimer(defaultRecord?.restTime ?? exercise.defaultRestTime, exercise.exerciseId);
+  }
   useAsNextDefault.checked = activeRecord?.useAsNextDefault ?? true;
   modal.classList.add("show");
 }
@@ -624,6 +670,8 @@ function stopWorkoutTimer() {
 function resetActiveWorkoutState() {
   activeWorkoutSession = null;
   stopWorkoutTimer();
+  resetRestTimer();
+  activeExerciseId = null;
   workoutType.value = "";
   workoutTypeButtons.forEach((button) => {
     button.classList.remove("selected");
