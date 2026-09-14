@@ -177,6 +177,19 @@ const sessionHistoryList = document.getElementById("sessionHistoryList");
 const weightChartCanvas = document.getElementById("weightChart");
 const exerciseChartSelect = document.getElementById("exerciseChartSelect");
 const exerciseChartCanvas = document.getElementById("exerciseChart");
+const progressCurrentWeight = document.getElementById("progressCurrentWeight");
+const progressWeightChange = document.getElementById("progressWeightChange");
+const progressStrengthExercise = document.getElementById("progressStrengthExercise");
+const progressBestWeight = document.getElementById("progressBestWeight");
+const progressBest1RM = document.getElementById("progressBest1RM");
+const bodyWeightChangeText = document.getElementById("bodyWeightChangeText");
+const weightChartContainer = document.getElementById("weightChartContainer");
+const weightChartEmpty = document.getElementById("weightChartEmpty");
+const strengthBestWeight = document.getElementById("strengthBestWeight");
+const strengthBest1RM = document.getElementById("strengthBest1RM");
+const strengthRecordCount = document.getElementById("strengthRecordCount");
+const exerciseChartContainer = document.getElementById("exerciseChartContainer");
+const strengthChartEmpty = document.getElementById("strengthChartEmpty");
 const activeWorkoutStatus = document.getElementById("activeWorkoutStatus");
 const activeWorkoutTitle = document.getElementById("activeWorkoutTitle");
 const activeWorkoutExerciseCount = document.getElementById("activeWorkoutExerciseCount");
@@ -792,21 +805,22 @@ function renderSessionHistory() {
 // ============================================================
 
 function loadCurrentWeight() {
-  const weightHistory = getBodyWeightHistory();
+  const weightHistory = getSortedWeightHistory();
   if (weightHistory.length > 0) {
     currentWeight.textContent = weightHistory[weightHistory.length - 1].weight;
   }
 }
 
 saveWeightBtn.addEventListener("click", () => {
-  if (bodyWeightInput.value === "") {
-    alert("体重を入力してください");
+  const weight = Number(bodyWeightInput.value);
+  if (bodyWeightInput.value === "" || !Number.isFinite(weight) || weight <= 0) {
+    alert("0より大きい体重を入力してください。");
     return;
   }
 
   const now = new Date();
   const weightRecord = {
-    weight: toFiniteNumber(bodyWeightInput.value),
+    weight,
     date: now.toLocaleDateString(),
     createdAt: now.toISOString()
   };
@@ -865,9 +879,120 @@ function canRenderCharts() {
   return true;
 }
 
+function getRecordTime(record, fallbackIndex = 0) {
+  const createdAtTime = Date.parse(record.createdAt);
+  if (Number.isFinite(createdAtTime)) return createdAtTime;
+
+  const startedAtTime = Date.parse(record.startedAt);
+  if (Number.isFinite(startedAtTime)) return startedAtTime;
+
+  const dateTime = Date.parse(record.date);
+  return Number.isFinite(dateTime) ? dateTime : fallbackIndex;
+}
+
+function getSortedWeightHistory() {
+  return getBodyWeightHistory()
+    .filter((record) => Number.isFinite(record.weight) && record.weight > 0)
+    .map((record, index) => ({ record, index }))
+    .sort((left, right) =>
+      getRecordTime(left.record, left.index) - getRecordTime(right.record, right.index)
+    )
+    .map(({ record }) => record);
+}
+
+function formatWeightValue(value) {
+  return Number.isFinite(value) ? `${value} kg` : "—";
+}
+
+function formatWeightChange(value) {
+  if (!Number.isFinite(value)) return "—";
+  const roundedValue = Number(value.toFixed(1));
+  const sign = roundedValue > 0 ? "+" : "";
+  return `${sign}${roundedValue} kg`;
+}
+
+function updateBodyWeightSummary(weightHistory) {
+  if (weightHistory.length === 0) {
+    currentWeight.textContent = "—";
+    progressCurrentWeight.textContent = "—";
+    progressWeightChange.textContent = "—";
+    bodyWeightChangeText.textContent = "No records yet";
+    return;
+  }
+
+  const firstWeight = weightHistory[0].weight;
+  const latestWeight = weightHistory[weightHistory.length - 1].weight;
+  const change = latestWeight - firstWeight;
+  const formattedChange = formatWeightChange(change);
+
+  currentWeight.textContent = formatWeightValue(latestWeight);
+  progressCurrentWeight.textContent = formatWeightValue(latestWeight);
+  progressWeightChange.textContent = formattedChange;
+  bodyWeightChangeText.textContent = `${formattedChange} from first record`;
+}
+
+function getStrengthProgress(exerciseId) {
+  const sessions = getWorkoutSessions().sort(
+    (left, right) => getRecordTime(left) - getRecordTime(right)
+  );
+  const records = sessions.flatMap((session) =>
+    session.exercises
+      .filter((record) => record.exerciseId === exerciseId)
+      .map((record) => ({ ...record, sessionDate: session.date }))
+  );
+  const chartRecords = [];
+  let bestWeight = null;
+  let bestEstimated1RM = null;
+
+  records.forEach((record) => {
+    const validSets = record.sets.filter((set) =>
+      Number.isFinite(set.weight) && Number.isFinite(set.reps) &&
+      set.weight > 0 && set.reps > 0
+    );
+    if (validSets.length === 0) return;
+
+    const maxWeight = Math.max(...validSets.map((set) => set.weight));
+    const maxEstimated1RM = Math.max(
+      ...validSets.map((set) => set.weight * (1 + set.reps / 30))
+    );
+    bestWeight = bestWeight === null ? maxWeight : Math.max(bestWeight, maxWeight);
+    bestEstimated1RM = bestEstimated1RM === null
+      ? maxEstimated1RM
+      : Math.max(bestEstimated1RM, maxEstimated1RM);
+    chartRecords.push({
+      date: record.sessionDate,
+      maxWeight,
+      estimated1RM: Number(maxEstimated1RM.toFixed(1))
+    });
+  });
+
+  return {
+    recordCount: records.length,
+    bestWeight,
+    bestEstimated1RM: bestEstimated1RM === null
+      ? null
+      : Number(bestEstimated1RM.toFixed(1)),
+    chartRecords
+  };
+}
+
 function renderWeightChart() {
+  const weightHistory = getSortedWeightHistory();
+  updateBodyWeightSummary(weightHistory);
+  const hasWeightData = weightHistory.length > 0;
+  weightChartContainer.hidden = !hasWeightData;
+  weightChartEmpty.hidden = hasWeightData;
+
+  if (!hasWeightData) {
+    if (weightChart) {
+      weightChart.destroy();
+      weightChart = null;
+    }
+    weightChartNeedsUpdate = false;
+    return;
+  }
+
   if (!canRenderCharts()) return;
-  const weightHistory = getBodyWeightHistory();
   if (weightChart) weightChart.destroy();
 
   weightChart = new Chart(weightChartCanvas, {
@@ -882,6 +1007,7 @@ function renderWeightChart() {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: true } },
       scales: { y: { beginAtZero: false } }
     }
@@ -901,45 +1027,56 @@ function populateExerciseChartSelect() {
 }
 
 function renderExerciseChart() {
-  if (!canRenderCharts()) return;
-
   const selectedExerciseId = exerciseChartSelect.value;
-  const exerciseHistory = getWorkoutSessions()
-    .flatMap((session) => session.exercises.map((record) => ({
-      ...record,
-      sessionDate: session.date
-    })))
-    .filter((record) => record.exerciseId === selectedExerciseId);
-  const labels = [];
-  const weights = [];
-  const estimated1RMs = [];
+  const selectedExercise = EXERCISE_BY_ID.get(selectedExerciseId);
+  const progress = getStrengthProgress(selectedExerciseId);
+  const hasStrengthData = progress.chartRecords.length > 0;
 
-  exerciseHistory.forEach((record) => {
-    const validSets = record.sets.filter((set) =>
-      Number.isFinite(set.weight) && Number.isFinite(set.reps) &&
-      set.weight > 0 && set.reps > 0
-    );
-    if (validSets.length === 0) return;
+  progressStrengthExercise.textContent = selectedExercise?.name || "Exercise";
+  progressBestWeight.textContent = progress.bestWeight === null
+    ? "Best —"
+    : `Best ${progress.bestWeight} kg`;
+  progressBest1RM.textContent = progress.bestEstimated1RM === null
+    ? "Est. 1RM —"
+    : `Est. 1RM ${progress.bestEstimated1RM} kg`;
+  strengthBestWeight.textContent = formatWeightValue(progress.bestWeight);
+  strengthBest1RM.textContent = formatWeightValue(progress.bestEstimated1RM);
+  strengthRecordCount.textContent = progress.recordCount;
+  exerciseChartContainer.hidden = !hasStrengthData;
+  strengthChartEmpty.hidden = hasStrengthData;
 
-    labels.push(record.sessionDate);
-    weights.push(Math.max(...validSets.map((set) => set.weight)));
-    estimated1RMs.push(Number(Math.max(
-      ...validSets.map((set) => set.weight * (1 + set.reps / 30))
-    ).toFixed(1)));
-  });
+  if (!hasStrengthData) {
+    if (exerciseChart) {
+      exerciseChart.destroy();
+      exerciseChart = null;
+    }
+    exerciseChartNeedsUpdate = false;
+    return;
+  }
+
+  if (!canRenderCharts()) return;
 
   if (exerciseChart) exerciseChart.destroy();
   exerciseChart = new Chart(exerciseChartCanvas, {
     type: "line",
     data: {
-      labels,
+      labels: progress.chartRecords.map((record) => record.date),
       datasets: [
-        { label: "Max Weight (kg)", data: weights, tension: 0.3 },
-        { label: "Estimated 1RM (kg)", data: estimated1RMs, tension: 0.3 }
+        {
+          label: "Max Weight (kg)",
+          data: progress.chartRecords.map((record) => record.maxWeight),
+          tension: 0.3
+        },
+        {
+          label: "Estimated 1RM (kg)",
+          data: progress.chartRecords.map((record) => record.estimated1RM),
+          tension: 0.3
+        }
       ]
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       scales: { y: { beginAtZero: false } }
     }
   });

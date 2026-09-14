@@ -490,6 +490,242 @@
     }
   }
 
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .progress-summary-card,
+  .progress-card {
+    margin-bottom: 18px;
+    padding: 22px;
+    border-radius: 16px;
+    background: white;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  }
+
+  .progress-eyebrow {
+    margin: 0 0 16px;
+    color: #777;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 0.12em;
+  }
+
+  .progress-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .progress-summary-item {
+    min-width: 0;
+    padding: 16px;
+    border-radius: 12px;
+    background: #f6f6f6;
+  }
+
+  .progress-summary-item > span {
+    display: block;
+    margin-bottom: 7px;
+    color: #777;
+    font-size: 13px;
+  }
+
+  .progress-summary-item strong {
+    display: block;
+    font-size: 21px;
+    line-height: 1.25;
+  }
+
+  .progress-strength-summary {
+    grid-column: 1 / -1;
+  }
+
+  .progress-strength-summary small {
+    display: block;
+    margin-top: 5px;
+    color: #555;
+    font-size: 15px;
+  }
+
+  .progress-card h2 {
+    margin: 0 0 18px;
+    font-size: 21px;
+  }
+
+  .progress-primary-value {
+    font-size: 36px;
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .progress-change-text {
+    margin-top: 4px;
+    color: #666;
+    font-size: 14px;
+  }
+
+  .progress-card .weight-input-area {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    margin: 20px 0;
+  }
+
+  .weight-input-control {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    border: 1px solid #d5d5d5;
+    border-radius: 10px;
+    background: white;
+  }
+
+  .weight-input-control input {
+    width: 100%;
+    min-width: 0;
+    min-height: 48px;
+    padding: 10px 6px 10px 12px;
+    border: 0;
+    outline: none;
+    background: transparent;
+    font-size: 16px;
+  }
+
+  .weight-input-control > span:last-child {
+    padding-right: 12px;
+    color: #666;
+  }
+
+  .progress-card .weight-input-area button {
+    min-height: 48px;
+    padding: 0 16px;
+    background: #111;
+    color: white;
+    font-weight: bold;
+  }
+
+  .progress-card .chart-container {
+    height: 280px;
+    min-height: 0;
+    margin-top: 20px;
+    overflow: hidden;
+  }
+
+  .progress-card .chart-container canvas {
+    max-width: 100%;
+  }
+
+  .progress-empty-state {
+    display: flex;
+    min-height: 180px;
+    margin-top: 20px;
+    padding: 24px;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 8px;
+    border: 1px dashed #d5d5d5;
+    border-radius: 12px;
+    color: #777;
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  .progress-empty-state strong {
+    color: #333;
+    font-size: 16px;
+  }
+
+  .exercise-select-label {
+    display: block;
+    margin-bottom: 7px;
+    color: #666;
+    font-size: 13px;
+    font-weight: bold;
+  }
+
+  #exerciseChartSelect {
+    width: 100%;
+    min-height: 48px;
+    padding: 0 12px;
+    border: 1px solid #d5d5d5;
+    border-radius: 10px;
+    background: white;
+    font-size: 16px;
+  }
+
+  .strength-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .strength-metrics > div {
+    min-width: 0;
+    padding: 13px;
+    border-radius: 10px;
+    background: #f6f6f6;
+  }
+
+  .strength-metrics span {
+    display: block;
+    min-height: 30px;
+    margin-bottom: 5px;
+    color: #777;
+    font-size: 12px;
+    line-height: 1.25;
+  }
+
+  .strength-metrics strong {
+    font-size: 18px;
+    line-height: 1.3;
+  }
+
+  @media (max-width: 600px) {
+    .progress-summary-card,
+    .progress-card {
+      padding: 18px;
+    }
+
+    .progress-summary-item {
+      padding: 14px;
+    }
+
+    .progress-summary-item strong {
+      font-size: 19px;
+    }
+
+    .progress-card .weight-input-area {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .progress-card .weight-input-area button {
+      width: 100%;
+    }
+
+    .progress-card .chart-container {
+      height: 240px;
+    }
+
+    .strength-metrics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .strength-metrics > div:last-child {
+      grid-column: 1 / -1;
+    }
+  }
+
   [hidden] {
     display: none !important;
   }
