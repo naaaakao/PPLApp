@@ -26,29 +26,28 @@ const EXERCISES = [
 ];
 
 const EXERCISE_BY_ID = new Map(EXERCISES.map((exercise) => [exercise.exerciseId, exercise]));
-const EXERCISE_BY_NAME = new Map(EXERCISES.map((exercise) => [exercise.name, exercise]));
 
 // ============================================================
 // 共通ユーティリティ・データ保存
 // ============================================================
 
 const STORAGE_KEYS = Object.freeze({
-  workoutHistory: "workoutHistory",
   workoutSessions: "workoutSessions",
+  activeWorkoutSession: "activeWorkoutSession",
   bodyWeightHistory: "bodyWeightHistory"
 });
 
-function loadArray(key) {
+function loadJson(key, fallback) {
   try {
-    const value = JSON.parse(localStorage.getItem(key));
-    return Array.isArray(value) ? value : [];
+    const storedValue = localStorage.getItem(key);
+    return storedValue === null ? fallback : JSON.parse(storedValue);
   } catch (error) {
     console.warn(`Failed to load localStorage key: ${key}`, error);
-    return [];
+    return fallback;
   }
 }
 
-function saveArray(key, value) {
+function saveJson(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
     return true;
@@ -58,20 +57,21 @@ function saveArray(key, value) {
   }
 }
 
+function removeStoredValue(key) {
+  try {
+    localStorage.removeItem(key);
+    return true;
+  } catch (error) {
+    console.error(`Failed to remove localStorage key: ${key}`, error);
+    return false;
+  }
+}
+
 function createId(prefix) {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return `${prefix}-${crypto.randomUUID()}`;
   }
-
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function createTimestamp() {
-  const now = new Date();
-  return {
-    createdAt: now.toISOString(),
-    date: now.toLocaleDateString()
-  };
 }
 
 function toFiniteNumber(value, fallback = 0) {
@@ -79,70 +79,79 @@ function toFiniteNumber(value, fallback = 0) {
   return Number.isFinite(number) ? number : fallback;
 }
 
-function findExerciseForRecord(record) {
-  return EXERCISE_BY_ID.get(record.exerciseId) || EXERCISE_BY_NAME.get(record.exercise);
-}
-
-function normalizeWorkoutRecord(record) {
-  const exercise = findExerciseForRecord(record);
-
+function normalizeExerciseRecord(record) {
   return {
-    ...record,
-    recordId: record.recordId || createId("record"),
-    exerciseId: record.exerciseId || exercise?.exerciseId || "",
-    exercise: record.exercise || exercise?.name || "Unknown Exercise",
-    sets: Array.isArray(record.sets)
+    recordId: typeof record?.recordId === "string" ? record.recordId : createId("record"),
+    exerciseId: typeof record?.exerciseId === "string" ? record.exerciseId : "",
+    exercise: typeof record?.exercise === "string" ? record.exercise : "Unknown Exercise",
+    sets: Array.isArray(record?.sets)
       ? record.sets.map((set) => ({
           weight: toFiniteNumber(set.weight),
           reps: toFiniteNumber(set.reps)
         }))
-      : record.sets,
-    restTime: toFiniteNumber(record.restTime, 90),
-    createdAt: record.createdAt || null,
-    useAsNextDefault: record.useAsNextDefault === true
+      : [],
+    restTime: toFiniteNumber(record?.restTime, 90),
+    useAsNextDefault: record?.useAsNextDefault === true,
+    createdAt: typeof record?.createdAt === "string" ? record.createdAt : new Date().toISOString()
   };
 }
 
-function getWorkoutHistory() {
-  return loadArray(STORAGE_KEYS.workoutHistory).map(normalizeWorkoutRecord);
-}
-
-function saveWorkoutHistory(history) {
-  return saveArray(STORAGE_KEYS.workoutHistory, history);
-}
-
-function normalizeSessionRecord(session) {
+function normalizeSession(session) {
   return {
-    ...session,
-    sessionId: session.sessionId || createId("session"),
-    type: typeof session.type === "string" ? session.type : "",
-    duration: toFiniteNumber(session.duration),
-    createdAt: session.createdAt || null
+    sessionId: typeof session?.sessionId === "string" ? session.sessionId : createId("session"),
+    type: typeof session?.type === "string" ? session.type : "",
+    startedAt: typeof session?.startedAt === "string" ? session.startedAt : "",
+    finishedAt: typeof session?.finishedAt === "string" ? session.finishedAt : null,
+    duration: toFiniteNumber(session?.duration),
+    date: typeof session?.date === "string" ? session.date : "",
+    exercises: Array.isArray(session?.exercises)
+      ? session.exercises.map(normalizeExerciseRecord)
+      : []
   };
 }
 
 function getWorkoutSessions() {
-  return loadArray(STORAGE_KEYS.workoutSessions).map(normalizeSessionRecord);
+  const sessions = loadJson(STORAGE_KEYS.workoutSessions, []);
+  return Array.isArray(sessions) ? sessions.map(normalizeSession) : [];
 }
 
 function saveWorkoutSessions(sessions) {
-  return saveArray(STORAGE_KEYS.workoutSessions, sessions);
+  return saveJson(STORAGE_KEYS.workoutSessions, sessions);
+}
+
+function getActiveWorkoutSession() {
+  const session = loadJson(STORAGE_KEYS.activeWorkoutSession, null);
+  if (!session || typeof session !== "object" || Array.isArray(session)) return null;
+
+  const normalizedSession = normalizeSession(session);
+  return normalizedSession.startedAt ? normalizedSession : null;
+}
+
+function saveActiveWorkoutSession(session) {
+  return saveJson(STORAGE_KEYS.activeWorkoutSession, session);
+}
+
+function clearActiveWorkoutSession() {
+  return removeStoredValue(STORAGE_KEYS.activeWorkoutSession);
 }
 
 function getBodyWeightHistory() {
-  return loadArray(STORAGE_KEYS.bodyWeightHistory).map((record) => ({
-    ...record,
-    weight: toFiniteNumber(record.weight),
-    createdAt: record.createdAt || null
+  const history = loadJson(STORAGE_KEYS.bodyWeightHistory, []);
+  if (!Array.isArray(history)) return [];
+
+  return history.map((record) => ({
+    weight: toFiniteNumber(record?.weight),
+    date: typeof record?.date === "string" ? record.date : "",
+    createdAt: typeof record?.createdAt === "string" ? record.createdAt : null
   }));
 }
 
 function saveBodyWeightHistory(history) {
-  return saveArray(STORAGE_KEYS.bodyWeightHistory, history);
+  return saveJson(STORAGE_KEYS.bodyWeightHistory, history);
 }
 
 // ============================================================
-// DOM参照・基本画面描画
+// DOM参照・画面生成
 // ============================================================
 
 const workoutSection = document.getElementById("workoutSection");
@@ -153,7 +162,6 @@ const setsContainer = document.getElementById("setsContainer");
 const addSetBtn = document.getElementById("addSetBtn");
 const saveWorkoutBtn = document.getElementById("saveWorkoutBtn");
 const useAsNextDefault = document.getElementById("useAsNextDefault");
-const historyList = document.getElementById("historyList");
 const restTimeInput = document.getElementById("restTimeInput");
 const restTimerDisplay = document.getElementById("restTimerDisplay");
 const startRestBtn = document.getElementById("startRestBtn");
@@ -267,15 +275,17 @@ function updateRestTimerDisplay() {
 function setRestTimer(seconds) {
   clearInterval(restTimerInterval);
   restTimerInterval = null;
-  restSecondsRemaining = toFiniteNumber(seconds, 90);
+  restSecondsRemaining = Math.max(0, toFiniteNumber(seconds, 90));
   restTimeInput.value = restSecondsRemaining;
   updateRestTimerDisplay();
 }
 
 startRestBtn.addEventListener("click", () => {
   clearInterval(restTimerInterval);
-  restSecondsRemaining = toFiniteNumber(restTimeInput.value, 0);
+  restSecondsRemaining = Math.max(0, toFiniteNumber(restTimeInput.value));
   updateRestTimerDisplay();
+
+  if (restSecondsRemaining === 0) return;
 
   restTimerInterval = setInterval(() => {
     restSecondsRemaining--;
@@ -289,13 +299,28 @@ startRestBtn.addEventListener("click", () => {
   }, 1000);
 });
 
-resetRestBtn.addEventListener("click", () => {
-  setRestTimer(restTimeInput.value);
-});
+resetRestBtn.addEventListener("click", () => setRestTimer(restTimeInput.value));
 
 // ============================================================
 // Workout種目記録
 // ============================================================
+
+function findLatestDefaultExerciseRecord(exerciseId) {
+  const records = getWorkoutSessions()
+    .flatMap((session) => session.exercises)
+    .filter((record) =>
+      record.exerciseId === exerciseId && record.useAsNextDefault === true
+    );
+
+  const activeRecord = getActiveWorkoutSession()?.exercises.find((record) =>
+    record.exerciseId === exerciseId && record.useAsNextDefault === true
+  );
+  if (activeRecord) records.push(activeRecord);
+
+  return records.sort((left, right) =>
+    Date.parse(right.createdAt) - Date.parse(left.createdAt)
+  )[0] || null;
+}
 
 function openWorkoutModal(exerciseId) {
   const exercise = EXERCISE_BY_ID.get(exerciseId);
@@ -305,25 +330,21 @@ function openWorkoutModal(exerciseId) {
   modalExerciseName.textContent = exercise.name;
   setsContainer.innerHTML = "";
 
-  const lastDefaultWorkout = getWorkoutHistory()
-    .slice()
-    .reverse()
-    .find((record) =>
-      record.exerciseId === exercise.exerciseId &&
-      record.useAsNextDefault === true &&
-      Array.isArray(record.sets)
-    );
+  const activeRecord = getActiveWorkoutSession()?.exercises.find(
+    (record) => record.exerciseId === exercise.exerciseId
+  );
+  const defaultRecord = activeRecord || findLatestDefaultExerciseRecord(exercise.exerciseId);
 
-  if (lastDefaultWorkout) {
-    lastDefaultWorkout.sets.forEach((set) => addSet(set.weight, set.reps));
+  if (defaultRecord) {
+    defaultRecord.sets.forEach((set) => addSet(set.weight, set.reps));
   } else {
     for (let index = 0; index < exercise.defaultSets; index++) {
       addSet(exercise.defaultWeight ?? "", exercise.defaultReps);
     }
   }
 
-  setRestTimer(lastDefaultWorkout?.restTime ?? exercise.defaultRestTime);
-  useAsNextDefault.checked = true;
+  setRestTimer(defaultRecord?.restTime ?? exercise.defaultRestTime);
+  useAsNextDefault.checked = activeRecord?.useAsNextDefault ?? true;
   modal.classList.add("show");
 }
 
@@ -332,153 +353,174 @@ workoutSection.addEventListener("click", (event) => {
   if (button) openWorkoutModal(button.dataset.exerciseId);
 });
 
-closeModalButton.addEventListener("click", () => {
-  modal.classList.remove("show");
-});
-
+closeModalButton.addEventListener("click", () => modal.classList.remove("show"));
 addSetBtn.addEventListener("click", () => addSet());
 
 saveWorkoutBtn.addEventListener("click", () => {
+  const activeSession = getActiveWorkoutSession();
+  if (!activeSession) {
+    alert("先にWorkoutを開始してください。");
+    return;
+  }
+
   const exercise = EXERCISE_BY_ID.get(activeExerciseId);
   if (!exercise) return;
 
+  const existingIndex = activeSession.exercises.findIndex(
+    (record) => record.exerciseId === exercise.exerciseId
+  );
+  const existingRecord = activeSession.exercises[existingIndex];
   const sets = Array.from(setsContainer.querySelectorAll(".set-row")).map((row) => ({
     weight: toFiniteNumber(row.querySelector(".set-weight").value),
     reps: toFiniteNumber(row.querySelector(".set-reps").value)
   }));
 
-  const timestamp = createTimestamp();
-  const workoutRecord = {
-    recordId: createId("record"),
+  const exerciseRecord = {
+    recordId: existingRecord?.recordId || createId("record"),
     exerciseId: exercise.exerciseId,
     exercise: exercise.name,
     sets,
     restTime: toFiniteNumber(restTimeInput.value, exercise.defaultRestTime),
-    date: timestamp.date,
-    createdAt: timestamp.createdAt,
-    useAsNextDefault: useAsNextDefault.checked
+    useAsNextDefault: useAsNextDefault.checked,
+    createdAt: existingRecord?.createdAt || new Date().toISOString()
   };
 
-  const workoutHistory = getWorkoutHistory();
-  workoutHistory.push(workoutRecord);
+  if (existingIndex >= 0) {
+    activeSession.exercises[existingIndex] = exerciseRecord;
+  } else {
+    activeSession.exercises.push(exerciseRecord);
+  }
 
-  if (!saveWorkoutHistory(workoutHistory)) {
+  if (!saveActiveWorkoutSession(activeSession)) {
     alert("Workoutを保存できませんでした。");
     return;
   }
 
-  renderHistory();
-  renderExerciseChart();
   alert("Workout saved!");
   modal.classList.remove("show");
 });
 
-function renderHistory() {
-  const workoutHistory = getWorkoutHistory();
-  historyList.innerHTML = "";
-
-  workoutHistory.slice().reverse().forEach((record) => {
-    const historyItem = document.createElement("div");
-    historyItem.className = "history-item";
-
-    const exerciseName = document.createElement("strong");
-    exerciseName.textContent = record.exercise;
-
-    const setsElement = document.createElement("div");
-    setsElement.className = "history-sets";
-
-    if (Array.isArray(record.sets)) {
-      record.sets.forEach((set, index) => {
-        const setElement = document.createElement("div");
-        setElement.textContent = `Set ${index + 1}： ${set.weight}kg × ${set.reps} reps`;
-        setsElement.appendChild(setElement);
-      });
-    } else {
-      setsElement.textContent = "旧形式のWorkout記録";
-    }
-
-    const dateElement = document.createElement("div");
-    dateElement.className = "history-date";
-    dateElement.textContent = record.date || "";
-
-    const deleteButton = document.createElement("button");
-    deleteButton.className = "delete-history-btn";
-    deleteButton.type = "button";
-    deleteButton.textContent = "Delete";
-    deleteButton.addEventListener("click", () => {
-      const updatedHistory = workoutHistory.filter(
-        (item) => item.recordId !== record.recordId
-      );
-      saveWorkoutHistory(updatedHistory);
-      renderHistory();
-      renderExerciseChart();
-    });
-
-    historyItem.append(exerciseName, setsElement, dateElement, deleteButton);
-    historyList.appendChild(historyItem);
-  });
-}
-
 // ============================================================
-// Workout全体タイマー・Session履歴
+// Workout全体タイマー・Session管理
 // ============================================================
 
 let workoutTimerInterval = null;
-let workoutSeconds = 0;
-let workoutRunning = false;
+let activeWorkoutSession = null;
 
 function formatWorkoutDuration(totalSeconds) {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
+  const safeSeconds = Math.max(0, Math.floor(toFiniteNumber(totalSeconds)));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
   return `${String(hours).padStart(2, "0")}:` +
     `${String(minutes).padStart(2, "0")}:` +
     `${String(seconds).padStart(2, "0")}`;
 }
 
+function getActiveWorkoutDuration() {
+  if (!activeWorkoutSession) return 0;
+  const startedAtMs = Date.parse(activeWorkoutSession.startedAt);
+  if (!Number.isFinite(startedAtMs)) return 0;
+  return Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000));
+}
+
 function updateWorkoutTimerDisplay() {
-  workoutTimerDisplay.textContent = formatWorkoutDuration(workoutSeconds);
+  workoutTimerDisplay.textContent = formatWorkoutDuration(getActiveWorkoutDuration());
+}
+
+function startWorkoutTimer() {
+  clearInterval(workoutTimerInterval);
+  updateWorkoutTimerDisplay();
+  workoutTimerInterval = setInterval(updateWorkoutTimerDisplay, 1000);
+}
+
+function stopWorkoutTimer() {
+  clearInterval(workoutTimerInterval);
+  workoutTimerInterval = null;
 }
 
 startWorkoutBtn.addEventListener("click", () => {
-  if (workoutRunning) return;
+  if (activeWorkoutSession) return;
 
-  workoutRunning = true;
-  workoutTimerInterval = setInterval(() => {
-    workoutSeconds++;
-    updateWorkoutTimerDisplay();
-  }, 1000);
+  if (!workoutType.value) {
+    alert("Workout Typeを選択してからWorkoutを開始してください。");
+    return;
+  }
+
+  activeWorkoutSession = {
+    sessionId: createId("session"),
+    type: workoutType.value,
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    duration: 0,
+    date: "",
+    exercises: []
+  };
+
+  if (!saveActiveWorkoutSession(activeWorkoutSession)) {
+    activeWorkoutSession = null;
+    alert("Workoutを開始できませんでした。");
+    return;
+  }
+
+  startWorkoutTimer();
 });
 
 finishWorkoutBtn.addEventListener("click", () => {
-  if (!workoutRunning) return;
+  activeWorkoutSession = getActiveWorkoutSession();
+  if (!activeWorkoutSession) {
+    alert("進行中のWorkoutはありません。");
+    return;
+  }
 
-  clearInterval(workoutTimerInterval);
-  workoutTimerInterval = null;
-  workoutRunning = false;
+  if (activeWorkoutSession.exercises.length === 0) {
+    alert("種目が記録されていないため、Workoutを終了できません。");
+    return;
+  }
 
-  const timestamp = createTimestamp();
-  const sessionRecord = {
-    sessionId: createId("session"),
-    type: workoutType.value,
-    duration: workoutSeconds,
-    date: timestamp.date,
-    createdAt: timestamp.createdAt
-  };
+  const finishedAt = new Date();
+  const startedAtMs = Date.parse(activeWorkoutSession.startedAt);
+  activeWorkoutSession.finishedAt = finishedAt.toISOString();
+  activeWorkoutSession.duration = Math.max(
+    0,
+    Math.floor((finishedAt.getTime() - startedAtMs) / 1000)
+  );
+  activeWorkoutSession.date = finishedAt.toLocaleDateString();
 
   const workoutSessions = getWorkoutSessions();
-  workoutSessions.push(sessionRecord);
+  workoutSessions.push(activeWorkoutSession);
 
   if (!saveWorkoutSessions(workoutSessions)) {
     alert("Workout Sessionを保存できませんでした。");
     return;
   }
 
-  renderSessionHistory();
-  alert(`${workoutType.value} workout saved!\nTime: ${workoutTimerDisplay.textContent}`);
-  workoutSeconds = 0;
+  if (!clearActiveWorkoutSession()) {
+    workoutSessions.pop();
+    saveWorkoutSessions(workoutSessions);
+    alert("Workout Sessionを終了できませんでした。");
+    return;
+  }
+
+  const completedSession = activeWorkoutSession;
+  activeWorkoutSession = null;
+  stopWorkoutTimer();
   updateWorkoutTimerDisplay();
+  renderSessionHistory();
+  renderExerciseChart();
+  alert(`${completedSession.type} workout saved!\nTime: ${formatWorkoutDuration(completedSession.duration)}`);
 });
+
+function restoreActiveWorkout() {
+  activeWorkoutSession = getActiveWorkoutSession();
+  if (!activeWorkoutSession) {
+    updateWorkoutTimerDisplay();
+    return;
+  }
+
+  workoutType.value = activeWorkoutSession.type;
+  startWorkoutTimer();
+}
 
 function renderSessionHistory() {
   const workoutSessions = getWorkoutSessions();
@@ -493,14 +535,48 @@ function renderSessionHistory() {
     const sessionItem = document.createElement("div");
     sessionItem.className = "session-history-item";
 
-    const type = document.createElement("strong");
-    type.textContent = session.type;
-    const duration = document.createElement("div");
-    duration.textContent = formatWorkoutDuration(session.duration);
-    const date = document.createElement("div");
-    date.textContent = session.date || "";
+    const heading = document.createElement("strong");
+    heading.textContent = `${session.date} - ${session.type}`;
 
-    sessionItem.append(type, duration, date);
+    const duration = document.createElement("div");
+    duration.textContent = `Time: ${formatWorkoutDuration(session.duration)}`;
+
+    const exercises = document.createElement("div");
+    session.exercises.forEach((record) => {
+      const exerciseBlock = document.createElement("div");
+      exerciseBlock.className = "history-item";
+
+      const exerciseName = document.createElement("strong");
+      exerciseName.textContent = record.exercise;
+      exerciseBlock.appendChild(exerciseName);
+
+      record.sets.forEach((set, index) => {
+        const setElement = document.createElement("div");
+        setElement.textContent = `Set ${index + 1}： ${set.weight}kg × ${set.reps} reps`;
+        exerciseBlock.appendChild(setElement);
+      });
+
+      exercises.appendChild(exerciseBlock);
+    });
+
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "delete-history-btn";
+    deleteButton.type = "button";
+    deleteButton.textContent = "Delete";
+    deleteButton.addEventListener("click", () => {
+      const updatedSessions = workoutSessions.filter(
+        (item) => item.sessionId !== session.sessionId
+      );
+
+      if (saveWorkoutSessions(updatedSessions)) {
+        renderSessionHistory();
+        renderExerciseChart();
+      } else {
+        alert("Workout Sessionを削除できませんでした。");
+      }
+    });
+
+    sessionItem.append(heading, duration, exercises, deleteButton);
     sessionHistoryList.appendChild(sessionItem);
   });
 }
@@ -522,13 +598,12 @@ saveWeightBtn.addEventListener("click", () => {
     return;
   }
 
-  const timestamp = createTimestamp();
+  const now = new Date();
   const weightRecord = {
     weight: toFiniteNumber(bodyWeightInput.value),
-    date: timestamp.date,
-    createdAt: timestamp.createdAt
+    date: now.toLocaleDateString(),
+    createdAt: now.toISOString()
   };
-
   const weightHistory = getBodyWeightHistory();
   weightHistory.push(weightRecord);
 
@@ -560,7 +635,6 @@ function canRenderCharts() {
 
 function renderWeightChart() {
   if (!canRenderCharts()) return;
-
   const weightHistory = getBodyWeightHistory();
   if (weightChart) weightChart.destroy();
 
@@ -597,9 +671,12 @@ function renderExerciseChart() {
   if (!canRenderCharts()) return;
 
   const selectedExerciseId = exerciseChartSelect.value;
-  const exerciseHistory = getWorkoutHistory().filter((record) =>
-    record.exerciseId === selectedExerciseId && Array.isArray(record.sets)
-  );
+  const exerciseHistory = getWorkoutSessions()
+    .flatMap((session) => session.exercises.map((record) => ({
+      ...record,
+      sessionDate: session.date
+    })))
+    .filter((record) => record.exerciseId === selectedExerciseId);
   const labels = [];
   const weights = [];
   const estimated1RMs = [];
@@ -611,7 +688,7 @@ function renderExerciseChart() {
     );
     if (validSets.length === 0) return;
 
-    labels.push(record.date);
+    labels.push(record.sessionDate);
     weights.push(Math.max(...validSets.map((set) => set.weight)));
     estimated1RMs.push(Number(Math.max(
       ...validSets.map((set) => set.weight * (1 + set.reps / 30))
@@ -619,7 +696,6 @@ function renderExerciseChart() {
   });
 
   if (exerciseChart) exerciseChart.destroy();
-
   exerciseChart = new Chart(exerciseChartCanvas, {
     type: "line",
     data: {
@@ -645,12 +721,11 @@ exerciseChartSelect.addEventListener("change", renderExerciseChart);
 function initializeApp() {
   renderExerciseCards();
   populateExerciseChartSelect();
-  renderHistory();
   renderSessionHistory();
   loadCurrentWeight();
   renderWeightChart();
   renderExerciseChart();
-  updateWorkoutTimerDisplay();
+  restoreActiveWorkout();
   updateRestTimerDisplay();
 }
 
