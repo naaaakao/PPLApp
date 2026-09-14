@@ -119,12 +119,41 @@ function saveWorkoutSessions(sessions) {
   return saveJson(STORAGE_KEYS.workoutSessions, sessions);
 }
 
-function getActiveWorkoutSession() {
-  const session = loadJson(STORAGE_KEYS.activeWorkoutSession, null);
-  if (!session || typeof session !== "object" || Array.isArray(session)) return null;
+const VALID_WORKOUT_TYPES = ["Push", "Pull", "Legs"];
 
-  const normalizedSession = normalizeSession(session);
-  return normalizedSession.startedAt ? normalizedSession : null;
+function isValidActiveWorkoutSession(session) {
+  return Boolean(
+    session &&
+    typeof session === "object" &&
+    !Array.isArray(session) &&
+    typeof session.sessionId === "string" &&
+    session.sessionId.trim() !== "" &&
+    VALID_WORKOUT_TYPES.includes(session.type) &&
+    typeof session.startedAt === "string" &&
+    Number.isFinite(Date.parse(session.startedAt)) &&
+    Array.isArray(session.exercises)
+  );
+}
+
+function readActiveWorkoutSession() {
+  try {
+    const storedValue = localStorage.getItem(STORAGE_KEYS.activeWorkoutSession);
+    if (storedValue === null) return { session: null, invalid: false };
+
+    const session = JSON.parse(storedValue);
+    if (!isValidActiveWorkoutSession(session)) {
+      return { session: null, invalid: true };
+    }
+
+    return { session: normalizeSession(session), invalid: false };
+  } catch (error) {
+    console.warn("Failed to validate active Workout Session", error);
+    return { session: null, invalid: true };
+  }
+}
+
+function getActiveWorkoutSession() {
+  return readActiveWorkoutSession().session;
 }
 
 function saveActiveWorkoutSession(session) {
@@ -173,6 +202,7 @@ const workoutTimerDisplay = document.getElementById("workoutTimerDisplay");
 const workoutType = document.getElementById("workoutType");
 const startWorkoutBtn = document.getElementById("startWorkoutBtn");
 const finishWorkoutBtn = document.getElementById("finishWorkoutBtn");
+const cancelWorkoutBtn = document.getElementById("cancelWorkoutBtn");
 const sessionHistoryList = document.getElementById("sessionHistoryList");
 const weightChartCanvas = document.getElementById("weightChart");
 const exerciseChartSelect = document.getElementById("exerciseChartSelect");
@@ -429,6 +459,58 @@ workoutSection.addEventListener("click", (event) => {
 closeModalButton.addEventListener("click", () => modal.classList.remove("show"));
 addSetBtn.addEventListener("click", () => addSet());
 
+function validateExerciseSets() {
+  const setRows = Array.from(setsContainer.querySelectorAll(".set-row"));
+  if (setRows.length === 0) {
+    return {
+      sets: null,
+      error: "Add at least one set before saving this exercise."
+    };
+  }
+
+  const sets = [];
+  for (let index = 0; index < setRows.length; index++) {
+    const row = setRows[index];
+    const weightText = row.querySelector(".set-weight").value.trim();
+    const repsText = row.querySelector(".set-reps").value.trim();
+
+    if (weightText === "") {
+      return {
+        sets: null,
+        error: `Enter a weight for set ${index + 1}. Use 0 for bodyweight exercises.`
+      };
+    }
+
+    if (repsText === "") {
+      return {
+        sets: null,
+        error: `Enter at least 1 rep for set ${index + 1}.`
+      };
+    }
+
+    const weight = Number(weightText);
+    const reps = Number(repsText);
+
+    if (!Number.isFinite(weight) || weight < 0) {
+      return {
+        sets: null,
+        error: `Enter a weight of 0 or more for set ${index + 1}.`
+      };
+    }
+
+    if (!Number.isFinite(reps) || reps <= 0) {
+      return {
+        sets: null,
+        error: `Enter at least 1 rep for set ${index + 1}.`
+      };
+    }
+
+    sets.push({ weight, reps });
+  }
+
+  return { sets, error: null };
+}
+
 saveWorkoutBtn.addEventListener("click", () => {
   const activeSession = getActiveWorkoutSession();
   if (!activeSession) {
@@ -443,10 +525,12 @@ saveWorkoutBtn.addEventListener("click", () => {
     (record) => record.exerciseId === exercise.exerciseId
   );
   const existingRecord = activeSession.exercises[existingIndex];
-  const sets = Array.from(setsContainer.querySelectorAll(".set-row")).map((row) => ({
-    weight: toFiniteNumber(row.querySelector(".set-weight").value),
-    reps: toFiniteNumber(row.querySelector(".set-reps").value)
-  }));
+  const validation = validateExerciseSets();
+  if (validation.error) {
+    alert(validation.error);
+    return;
+  }
+  const sets = validation.sets;
 
   const exerciseRecord = {
     recordId: existingRecord?.recordId || createId("record"),
@@ -537,6 +621,17 @@ function stopWorkoutTimer() {
   workoutTimerInterval = null;
 }
 
+function resetActiveWorkoutState() {
+  activeWorkoutSession = null;
+  stopWorkoutTimer();
+  workoutType.value = "";
+  workoutTypeButtons.forEach((button) => {
+    button.classList.remove("selected");
+    button.setAttribute("aria-pressed", "false");
+  });
+  renderWorkoutState();
+}
+
 startWorkoutBtn.addEventListener("click", () => {
   if (activeWorkoutSession) return;
 
@@ -604,23 +699,41 @@ finishWorkoutBtn.addEventListener("click", () => {
   }
 
   const completedSession = activeWorkoutSession;
-  activeWorkoutSession = null;
-  stopWorkoutTimer();
-  workoutType.value = "";
-  workoutTypeButtons.forEach((button) => {
-    button.classList.remove("selected");
-    button.setAttribute("aria-pressed", "false");
-  });
-  renderWorkoutState();
+  resetActiveWorkoutState();
   renderSessionHistory();
   markExerciseChartForUpdate();
   alert(`${completedSession.type} workout saved!\nTime: ${formatWorkoutDuration(completedSession.duration)}`);
 });
 
+cancelWorkoutBtn.addEventListener("click", () => {
+  if (!activeWorkoutSession) return;
+
+  const shouldCancel = confirm(
+    "Cancel this workout?\nAll records from this active workout will be discarded."
+  );
+  if (!shouldCancel) return;
+
+  if (!clearActiveWorkoutSession()) {
+    alert("This workout could not be canceled. Please try again.");
+    return;
+  }
+
+  resetActiveWorkoutState();
+});
+
 function restoreActiveWorkout() {
-  activeWorkoutSession = getActiveWorkoutSession();
+  const activeSessionState = readActiveWorkoutSession();
+
+  if (activeSessionState.invalid) {
+    clearActiveWorkoutSession();
+    resetActiveWorkoutState();
+    alert("A damaged active workout was removed. Please start a new workout.");
+    return;
+  }
+
+  activeWorkoutSession = activeSessionState.session;
   if (!activeWorkoutSession) {
-    renderWorkoutState();
+    resetActiveWorkoutState();
     return;
   }
 

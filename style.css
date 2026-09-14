@@ -816,6 +816,23 @@
     background: #222;
   }
 
+  .active-workout-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .cancel-workout-btn {
+    min-height: 52px;
+    padding: 0 16px;
+    border: 1px solid #d5d5d5;
+    border-radius: 12px;
+    background: white;
+    color: #777;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
   .workout-section {
     align-items: flex-start;
   }
@@ -991,6 +1008,10 @@
 
     .active-workout-card .workout-timer-display {
       font-size: 36px;
+    }
+
+    .active-workout-actions {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .modal {
