@@ -177,9 +177,11 @@ const sessionHistoryList = document.getElementById("sessionHistoryList");
 const weightChartCanvas = document.getElementById("weightChart");
 const exerciseChartSelect = document.getElementById("exerciseChartSelect");
 const exerciseChartCanvas = document.getElementById("exerciseChart");
+const activeWorkoutStatus = document.getElementById("activeWorkoutStatus");
 const activeWorkoutTitle = document.getElementById("activeWorkoutTitle");
-const activeWorkoutTime = document.getElementById("activeWorkoutTime");
 const activeWorkoutExerciseCount = document.getElementById("activeWorkoutExerciseCount");
+const workoutStartCard = document.getElementById("workoutStartCard");
+const workoutTypeButtons = document.querySelectorAll(".workout-type-button");
 const appPages = document.querySelectorAll(".app-page");
 const navigationButtons = document.querySelectorAll(".nav-button");
 
@@ -210,31 +212,59 @@ navigationButtons.forEach((button) => {
   button.addEventListener("click", () => showPage(button.dataset.pageTarget));
 });
 
-function renderExerciseCards() {
-  workoutSection.innerHTML = "";
+workoutTypeButtons.forEach((button) => {
+  button.setAttribute("aria-pressed", "false");
+  button.addEventListener("click", () => {
+    if (activeWorkoutSession) return;
 
-  ["Push", "Pull", "Legs"].forEach((category) => {
+    workoutType.value = button.dataset.workoutType;
+    workoutTypeButtons.forEach((typeButton) => {
+      const isSelected = typeButton === button;
+      typeButton.classList.toggle("selected", isSelected);
+      typeButton.setAttribute("aria-pressed", String(isSelected));
+    });
+  });
+});
+
+function renderExerciseCards(session = null) {
+  workoutSection.innerHTML = "";
+  const categories = session ? [session.type] : ["Push", "Pull", "Legs"];
+  const recordedExerciseIds = new Set(
+    session?.exercises.map((record) => record.exerciseId) || []
+  );
+
+  categories.forEach((category) => {
     const card = document.createElement("div");
     card.className = "workout-card";
 
     const heading = document.createElement("h2");
-    heading.textContent = category;
+    heading.textContent = session ? `${category} Exercises` : category;
     card.appendChild(heading);
 
     EXERCISES.filter((exercise) => exercise.category === category).forEach((exercise) => {
       const row = document.createElement("div");
       row.className = "exercise";
 
+      const nameWrapper = document.createElement("div");
+      nameWrapper.className = "exercise-name-wrapper";
       const name = document.createElement("span");
+      name.className = "exercise-name";
       name.textContent = exercise.name;
+
+      const isRecorded = recordedExerciseIds.has(exercise.exerciseId);
+      const status = document.createElement("span");
+      status.className = "exercise-record-status";
+      status.textContent = isRecorded ? "✓ Recorded" : "Not recorded";
+      nameWrapper.append(name, status);
 
       const button = document.createElement("button");
       button.className = "start-btn";
       button.type = "button";
       button.dataset.exerciseId = exercise.exerciseId;
-      button.textContent = "▶";
+      button.textContent = isRecorded ? "Edit" : "Record";
+      row.classList.toggle("recorded", isRecorded);
 
-      row.append(name, button);
+      row.append(nameWrapper, button);
       card.appendChild(row);
     });
 
@@ -428,7 +458,8 @@ saveWorkoutBtn.addEventListener("click", () => {
 
   activeWorkoutSession = activeSession;
   updateWorkoutTimerDisplay();
-  alert("Workout saved!");
+  renderExerciseCards(activeWorkoutSession);
+  alert("Exercise saved!");
   modal.classList.remove("show");
 });
 
@@ -459,17 +490,27 @@ function getActiveWorkoutDuration() {
 function updateWorkoutTimerDisplay() {
   const formattedDuration = formatWorkoutDuration(getActiveWorkoutDuration());
   workoutTimerDisplay.textContent = formattedDuration;
-  activeWorkoutTime.textContent = formattedDuration;
 
   if (activeWorkoutSession) {
     const exerciseCount = activeWorkoutSession.exercises.length;
-    activeWorkoutTitle.textContent = `${activeWorkoutSession.type} Workout`;
+    const plannedExerciseCount = EXERCISES.filter(
+      (exercise) => exercise.category === activeWorkoutSession.type
+    ).length;
+    activeWorkoutTitle.textContent = `${activeWorkoutSession.type.toUpperCase()} WORKOUT`;
     activeWorkoutExerciseCount.textContent =
-      `${exerciseCount} ${exerciseCount === 1 ? "exercise" : "exercises"} recorded`;
+      `${exerciseCount} / ${plannedExerciseCount} exercises`;
   } else {
-    activeWorkoutTitle.textContent = "No active workout";
-    activeWorkoutExerciseCount.textContent = "0 exercises recorded";
+    activeWorkoutExerciseCount.textContent = "0 / 0 exercises";
   }
+}
+
+function renderWorkoutState() {
+  const hasActiveWorkout = activeWorkoutSession !== null;
+  activeWorkoutStatus.hidden = !hasActiveWorkout;
+  workoutStartCard.hidden = hasActiveWorkout;
+  workoutType.disabled = hasActiveWorkout;
+  renderExerciseCards(activeWorkoutSession);
+  updateWorkoutTimerDisplay();
 }
 
 function startWorkoutTimer() {
@@ -508,6 +549,7 @@ startWorkoutBtn.addEventListener("click", () => {
   }
 
   startWorkoutTimer();
+  renderWorkoutState();
 });
 
 finishWorkoutBtn.addEventListener("click", () => {
@@ -521,6 +563,8 @@ finishWorkoutBtn.addEventListener("click", () => {
     alert("種目が記録されていないため、Workoutを終了できません。");
     return;
   }
+
+  if (!confirm("このWorkoutを終了しますか？")) return;
 
   const finishedAt = new Date();
   const startedAtMs = Date.parse(activeWorkoutSession.startedAt);
@@ -549,7 +593,12 @@ finishWorkoutBtn.addEventListener("click", () => {
   const completedSession = activeWorkoutSession;
   activeWorkoutSession = null;
   stopWorkoutTimer();
-  updateWorkoutTimerDisplay();
+  workoutType.value = "";
+  workoutTypeButtons.forEach((button) => {
+    button.classList.remove("selected");
+    button.setAttribute("aria-pressed", "false");
+  });
+  renderWorkoutState();
   renderSessionHistory();
   markExerciseChartForUpdate();
   alert(`${completedSession.type} workout saved!\nTime: ${formatWorkoutDuration(completedSession.duration)}`);
@@ -558,12 +607,18 @@ finishWorkoutBtn.addEventListener("click", () => {
 function restoreActiveWorkout() {
   activeWorkoutSession = getActiveWorkoutSession();
   if (!activeWorkoutSession) {
-    updateWorkoutTimerDisplay();
+    renderWorkoutState();
     return;
   }
 
   workoutType.value = activeWorkoutSession.type;
+  workoutTypeButtons.forEach((button) => {
+    const isSelected = button.dataset.workoutType === activeWorkoutSession.type;
+    button.classList.toggle("selected", isSelected);
+    button.setAttribute("aria-pressed", String(isSelected));
+  });
   startWorkoutTimer();
+  renderWorkoutState();
 }
 
 const expandedHistorySessions = new Set();

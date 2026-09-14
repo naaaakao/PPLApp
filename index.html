@@ -18,49 +18,29 @@
 
     <section id="workoutPage" class="app-page active" data-page="workout">
 
-      <section id="activeWorkoutStatus" class="active-workout-card">
-        <h2 id="activeWorkoutTitle">No active workout</h2>
-        <div id="activeWorkoutTime" class="active-workout-time">00:00:00</div>
-        <div id="activeWorkoutExerciseCount">0 exercises recorded</div>
+      <section id="activeWorkoutStatus" class="active-workout-card" hidden>
+        <div class="active-workout-label">ACTIVE WORKOUT</div>
+        <h2 id="activeWorkoutTitle">PUSH WORKOUT</h2>
+        <div id="workoutTimerDisplay" class="workout-timer-display">00:00:00</div>
+        <div id="activeWorkoutExerciseCount" class="active-workout-progress">0 / 6 exercises</div>
+        <button id="finishWorkoutBtn" class="finish-workout-btn">Finish Workout</button>
       </section>
 
-      <section class="workout-timer-card">
-
-      <h2>Workout Timer</h2>
-    
-      <div id="workoutTimerDisplay" class="workout-timer-display">
-        00:00:00
-      </div>
-
-      <div class="workout-type-select">
-
-        <label for="workoutType">Workout Type</label>
-      
-        <select id="workoutType">
+      <section id="workoutStartCard" class="workout-start-card">
+        <p class="workout-start-label">START A WORKOUT</p>
+        <h2>What are you training today?</h2>
+        <div class="workout-type-buttons" role="group" aria-label="Workout Type">
+          <button class="workout-type-button" type="button" data-workout-type="Push">Push</button>
+          <button class="workout-type-button" type="button" data-workout-type="Pull">Pull</button>
+          <button class="workout-type-button" type="button" data-workout-type="Legs">Legs</button>
+        </div>
+        <select id="workoutType" hidden aria-label="Selected Workout Type">
           <option value="">Select</option>
           <option value="Push">Push</option>
           <option value="Pull">Pull</option>
           <option value="Legs">Legs</option>
         </select>
-      
-      </div>
-    
-      <div class="workout-timer-controls">
-    
-       
-        
-        <button id="startWorkoutBtn">
-          Start Workout
-        </button>
-    
-       
-        
-        <button id="finishWorkoutBtn">
-          Finish Workout
-        </button>
-    
-      </div>
-    
+        <button id="startWorkoutBtn" class="start-workout-btn">Start Workout</button>
       </section>
 
       <section id="workoutSection" class="workout-section"></section>
@@ -123,6 +103,7 @@
         <span>Set</span>
         <span>Weight</span>
         <span>Reps</span>
+        <span aria-hidden="true"></span>
       </div>
   
       <div id="setsContainer"></div>
@@ -139,23 +120,17 @@
           01:30
         </div>
       
+        <div class="rest-time-setting">
+          <label for="restTimeInput">Rest Time</label>
+          <div>
+            <input id="restTimeInput" type="number" min="10" step="10" value="90">
+            <span>sec</span>
+          </div>
+        </div>
+
         <div class="timer-controls">
-          <input
-            id="restTimeInput"
-            type="number"
-            min="10"
-            step="10"
-            value="90"
-          >
-          <span>sec</span>
-      
-          <button id="startRestBtn">
-            Start
-          </button>
-      
-          <button id="resetRestBtn">
-            Reset
-          </button>
+          <button id="startRestBtn">Start</button>
+          <button id="resetRestBtn">Reset</button>
         </div>
       
       </div>
@@ -170,7 +145,7 @@
       </label>
       
       <button id="saveWorkoutBtn" class="save-btn">
-        Save Workout
+        Save Exercise
       </button>
   
     </div>
