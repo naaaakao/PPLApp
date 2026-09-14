@@ -142,11 +142,18 @@
     <button class="nav-button" type="button" data-page-target="progress">Progress</button>
   </nav>
 
-  <div id="workoutModal" class="modal">
+  <div
+    id="workoutModal"
+    class="modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="modalExerciseName"
+    aria-hidden="true"
+  >
 
     <div class="modal-content">
   
-      <button id="closeModal" class="close-btn">×</button>
+      <button id="closeModal" class="close-btn" type="button" aria-label="Close exercise dialog">×</button>
   
       <h2 id="modalExerciseName">Exercise</h2>
   

@@ -232,6 +232,42 @@ const navigationButtons = document.querySelectorAll(".nav-button");
 
 let activeExerciseId = null;
 let currentPage = "workout";
+let modalTriggerElement = null;
+
+const MODAL_FOCUSABLE_SELECTOR = [
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "[href]",
+  "[tabindex]:not([tabindex='-1'])"
+].join(",");
+
+function getModalFocusableElements() {
+  return Array.from(modal.querySelectorAll(MODAL_FOCUSABLE_SELECTOR)).filter(
+    (element) => !element.hidden && element.getClientRects().length > 0
+  );
+}
+
+function closeWorkoutModal() {
+  if (!modal.classList.contains("show")) return;
+
+  modal.classList.remove("show");
+  modal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
+
+  const fallbackTrigger = activeExerciseId
+    ? workoutSection.querySelector(`[data-exercise-id="${activeExerciseId}"]`)
+    : null;
+  const focusTarget = modalTriggerElement?.isConnected
+    ? modalTriggerElement
+    : fallbackTrigger;
+  modalTriggerElement = null;
+
+  if (focusTarget) {
+    requestAnimationFrame(() => focusTarget.focus());
+  }
+}
 
 function showPage(pageName) {
   currentPage = pageName;
@@ -467,7 +503,7 @@ function findLatestDefaultExerciseRecord(exerciseId) {
   )[0] || null;
 }
 
-function openWorkoutModal(exerciseId) {
+function openWorkoutModal(exerciseId, triggerElement) {
   const exercise = EXERCISE_BY_ID.get(exerciseId);
   if (!exercise) return;
 
@@ -496,15 +532,52 @@ function openWorkoutModal(exerciseId) {
     setRestTimer(defaultRecord?.restTime ?? exercise.defaultRestTime, exercise.exerciseId);
   }
   useAsNextDefault.checked = activeRecord?.useAsNextDefault ?? true;
+  modalTriggerElement = triggerElement || document.activeElement;
   modal.classList.add("show");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+  requestAnimationFrame(() => closeModalButton.focus());
 }
 
 workoutSection.addEventListener("click", (event) => {
   const button = event.target.closest(".start-btn");
-  if (button) openWorkoutModal(button.dataset.exerciseId);
+  if (button) openWorkoutModal(button.dataset.exerciseId, button);
 });
 
-closeModalButton.addEventListener("click", () => modal.classList.remove("show"));
+closeModalButton.addEventListener("click", closeWorkoutModal);
+
+document.addEventListener("keydown", (event) => {
+  if (!modal.classList.contains("show")) return;
+
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeWorkoutModal();
+    return;
+  }
+
+  if (event.key !== "Tab") return;
+
+  const focusableElements = getModalFocusableElements();
+  if (focusableElements.length === 0) {
+    event.preventDefault();
+    return;
+  }
+
+  const firstElement = focusableElements[0];
+  const lastElement = focusableElements[focusableElements.length - 1];
+  const activeElement = document.activeElement;
+
+  if (!modal.contains(activeElement)) {
+    event.preventDefault();
+    firstElement.focus();
+  } else if (event.shiftKey && activeElement === firstElement) {
+    event.preventDefault();
+    lastElement.focus();
+  } else if (!event.shiftKey && activeElement === lastElement) {
+    event.preventDefault();
+    firstElement.focus();
+  }
+});
 addSetBtn.addEventListener("click", () => addSet());
 
 function validateExerciseSets() {
@@ -605,7 +678,7 @@ saveWorkoutBtn.addEventListener("click", () => {
   updateWorkoutTimerDisplay();
   renderExerciseCards(activeWorkoutSession);
   alert("Exercise saved!");
-  modal.classList.remove("show");
+  closeWorkoutModal();
 });
 
 // ============================================================
