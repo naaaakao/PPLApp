@@ -41,9 +41,7 @@
   }
 
   .active-workout-card,
-  .workout-timer-card,
   .session-history-card,
-  .weight-chart-card,
   .exercise-chart-card {
     background: white;
     padding: 24px;
@@ -52,22 +50,17 @@
   }
 
   .active-workout-card h2,
-  .workout-timer-card h2,
   .session-history-card h2,
-  .weight-chart-card h2,
   .exercise-chart-card h2 {
     margin-top: 0;
   }
 
-  .active-workout-time,
   .workout-timer-display {
     font-size: 32px;
     font-weight: bold;
     margin: 10px 0;
   }
 
-  .workout-type-select,
-  .workout-timer-controls,
   .weight-input-area,
   .timer-controls {
     display: flex;
@@ -83,7 +76,6 @@
     font: inherit;
   }
 
-  .workout-timer-controls button,
   .weight-input-area button,
   .timer-controls button,
   .add-set-btn {
@@ -289,15 +281,6 @@
     margin-top: 0;
   }
   
-  .weight-display {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 6px;
-    font-size: 32px;
-    font-weight: bold;
-  }
-  
   .workout-section {
     display: flex;
     gap: 20px;
@@ -399,23 +382,6 @@
     overscroll-behavior: contain;
   }
   
-  .input-group {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: 20px 0;
-  }
-  
-  .input-group label {
-    width: 70px;
-  }
-  
-  .input-group input {
-    flex: 1;
-    padding: 10px;
-    font-size: 16px;
-  }
-  
   .save-btn {
     width: 100%;
     padding: 14px;
@@ -430,23 +396,6 @@
     font-weight: bold;
   
     cursor: pointer;
-  }  
-
-  .history-section {
-    background: white;
-    margin-top: 25px;
-    padding: 20px;
-    border-radius: 16px;
-  }
-  
-  .history-item {
-    padding: 14px 0;
-    border-bottom: 1px solid #eee;
-  }
-  
-  .history-item strong {
-    display: block;
-    margin-bottom: 5px;
   }  
 
   .delete-history-btn {

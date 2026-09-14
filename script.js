@@ -1186,7 +1186,7 @@ function getStrengthProgress(exerciseId) {
   const records = sessions.flatMap((session) =>
     session.exercises
       .filter((record) => record.exerciseId === exerciseId)
-      .map((record) => ({ ...record, sessionDate: session.date }))
+      .map((record) => ({ ...record, sessionDate: getSessionDateLabel(session) }))
   );
   const chartRecords = [];
   let bestWeight = null;
@@ -1222,6 +1222,13 @@ function getStrengthProgress(exerciseId) {
       : Number(bestEstimated1RM.toFixed(1)),
     chartRecords
   };
+}
+
+function getSessionDateLabel(session) {
+  const startedAtTime = Date.parse(session.startedAt);
+  return Number.isFinite(startedAtTime)
+    ? new Date(startedAtTime).toLocaleDateString()
+    : session.date;
 }
 
 function renderWeightChart() {
