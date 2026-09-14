@@ -177,8 +177,38 @@ const sessionHistoryList = document.getElementById("sessionHistoryList");
 const weightChartCanvas = document.getElementById("weightChart");
 const exerciseChartSelect = document.getElementById("exerciseChartSelect");
 const exerciseChartCanvas = document.getElementById("exerciseChart");
+const activeWorkoutTitle = document.getElementById("activeWorkoutTitle");
+const activeWorkoutTime = document.getElementById("activeWorkoutTime");
+const activeWorkoutExerciseCount = document.getElementById("activeWorkoutExerciseCount");
+const appPages = document.querySelectorAll(".app-page");
+const navigationButtons = document.querySelectorAll(".nav-button");
 
 let activeExerciseId = null;
+let currentPage = "workout";
+
+function showPage(pageName) {
+  currentPage = pageName;
+
+  appPages.forEach((page) => {
+    page.classList.toggle("active", page.dataset.page === pageName);
+  });
+
+  navigationButtons.forEach((button) => {
+    const isActive = button.dataset.pageTarget === pageName;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-current", isActive ? "page" : "false");
+  });
+
+  if (pageName === "progress") {
+    requestAnimationFrame(() => {
+      refreshProgressCharts();
+    });
+  }
+}
+
+navigationButtons.forEach((button) => {
+  button.addEventListener("click", () => showPage(button.dataset.pageTarget));
+});
 
 function renderExerciseCards() {
   workoutSection.innerHTML = "";
@@ -396,6 +426,8 @@ saveWorkoutBtn.addEventListener("click", () => {
     return;
   }
 
+  activeWorkoutSession = activeSession;
+  updateWorkoutTimerDisplay();
   alert("Workout saved!");
   modal.classList.remove("show");
 });
@@ -425,7 +457,19 @@ function getActiveWorkoutDuration() {
 }
 
 function updateWorkoutTimerDisplay() {
-  workoutTimerDisplay.textContent = formatWorkoutDuration(getActiveWorkoutDuration());
+  const formattedDuration = formatWorkoutDuration(getActiveWorkoutDuration());
+  workoutTimerDisplay.textContent = formattedDuration;
+  activeWorkoutTime.textContent = formattedDuration;
+
+  if (activeWorkoutSession) {
+    const exerciseCount = activeWorkoutSession.exercises.length;
+    activeWorkoutTitle.textContent = `${activeWorkoutSession.type} Workout`;
+    activeWorkoutExerciseCount.textContent =
+      `${exerciseCount} ${exerciseCount === 1 ? "exercise" : "exercises"} recorded`;
+  } else {
+    activeWorkoutTitle.textContent = "No active workout";
+    activeWorkoutExerciseCount.textContent = "0 exercises recorded";
+  }
 }
 
 function startWorkoutTimer() {
@@ -507,7 +551,7 @@ finishWorkoutBtn.addEventListener("click", () => {
   stopWorkoutTimer();
   updateWorkoutTimerDisplay();
   renderSessionHistory();
-  renderExerciseChart();
+  markExerciseChartForUpdate();
   alert(`${completedSession.type} workout saved!\nTime: ${formatWorkoutDuration(completedSession.duration)}`);
 });
 
@@ -541,6 +585,10 @@ function renderSessionHistory() {
     const duration = document.createElement("div");
     duration.textContent = `Time: ${formatWorkoutDuration(session.duration)}`;
 
+    const exerciseCount = document.createElement("div");
+    exerciseCount.textContent =
+      `${session.exercises.length} ${session.exercises.length === 1 ? "exercise" : "exercises"}`;
+
     const exercises = document.createElement("div");
     session.exercises.forEach((record) => {
       const exerciseBlock = document.createElement("div");
@@ -570,13 +618,13 @@ function renderSessionHistory() {
 
       if (saveWorkoutSessions(updatedSessions)) {
         renderSessionHistory();
-        renderExerciseChart();
+        markExerciseChartForUpdate();
       } else {
         alert("Workout Sessionを削除できませんでした。");
       }
     });
 
-    sessionItem.append(heading, duration, exercises, deleteButton);
+    sessionItem.append(heading, duration, exerciseCount, exercises, deleteButton);
     sessionHistoryList.appendChild(sessionItem);
   });
 }
@@ -614,7 +662,7 @@ saveWeightBtn.addEventListener("click", () => {
 
   currentWeight.textContent = weightRecord.weight;
   bodyWeightInput.value = "";
-  renderWeightChart();
+  markWeightChartForUpdate();
   alert("体重を記録しました！");
 });
 
@@ -624,6 +672,32 @@ saveWeightBtn.addEventListener("click", () => {
 
 let weightChart = null;
 let exerciseChart = null;
+let weightChartNeedsUpdate = true;
+let exerciseChartNeedsUpdate = true;
+
+function markWeightChartForUpdate() {
+  weightChartNeedsUpdate = true;
+  if (currentPage === "progress") renderWeightChart();
+}
+
+function markExerciseChartForUpdate() {
+  exerciseChartNeedsUpdate = true;
+  if (currentPage === "progress") renderExerciseChart();
+}
+
+function refreshProgressCharts() {
+  if (weightChartNeedsUpdate || !weightChart) {
+    renderWeightChart();
+  } else {
+    weightChart.resize();
+  }
+
+  if (exerciseChartNeedsUpdate || !exerciseChart) {
+    renderExerciseChart();
+  } else {
+    exerciseChart.resize();
+  }
+}
 
 function canRenderCharts() {
   if (typeof Chart === "undefined") {
@@ -654,6 +728,7 @@ function renderWeightChart() {
       scales: { y: { beginAtZero: false } }
     }
   });
+  weightChartNeedsUpdate = false;
 }
 
 function populateExerciseChartSelect() {
@@ -710,9 +785,10 @@ function renderExerciseChart() {
       scales: { y: { beginAtZero: false } }
     }
   });
+  exerciseChartNeedsUpdate = false;
 }
 
-exerciseChartSelect.addEventListener("change", renderExerciseChart);
+exerciseChartSelect.addEventListener("change", markExerciseChartForUpdate);
 
 // ============================================================
 // 初期化
@@ -723,10 +799,9 @@ function initializeApp() {
   populateExerciseChartSelect();
   renderSessionHistory();
   loadCurrentWeight();
-  renderWeightChart();
-  renderExerciseChart();
   restoreActiveWorkout();
   updateRestTimerDisplay();
+  showPage("workout");
 }
 
 initializeApp();
