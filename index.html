@@ -16,99 +16,208 @@
 
   <main>
 
+    <section class="workout-timer-card">
+
+      <h2>Workout Timer</h2>
+    
+      <div id="workoutTimerDisplay" class="workout-timer-display">
+        00:00:00
+      </div>
+
+      <div class="workout-type-select">
+
+        <label for="workoutType">Workout Type</label>
+      
+        <select id="workoutType">
+          <option value="">Select</option>
+          <option value="Push">Push</option>
+          <option value="Pull">Pull</option>
+          <option value="Legs">Legs</option>
+        </select>
+      
+      </div>
+    
+      <div class="workout-timer-controls">
+    
+       
+        
+        <button id="startWorkoutBtn">
+          Start Workout
+        </button>
+    
+       
+        
+        <button id="finishWorkoutBtn">
+          Finish Workout
+        </button>
+    
+      </div>
+    
+    </section>
+
+    <section class="session-history-card">
+
+      <h2>Workout Sessions</h2>
+    
+      <div id="sessionHistoryList">
+        No workout sessions yet.
+      </div>
+    
+    </section>
+    
     <section class="weight-card">
       <h2>Current Weight</h2>
-
+    
       <div class="weight-display">
         <span id="currentWeight">67</span>
         <span>kg</span>
       </div>
+    
+      <div class="weight-input-area">
+        <input
+          id="bodyWeightInput"
+          type="number"
+          step="0.1"
+          placeholder="67.0"
+        >
+    
+        <button id="saveWeightBtn">
+          Record Weight
+        </button>
+      </div>
+    </section>
+
+    <section class="weight-chart-card">
+
+      <h2>Body Weight Progress</h2>
+    
+      <div class="chart-container">
+        <canvas id="weightChart"></canvas>
+      </div>
+    
+    </section> 
+
+    <section class="exercise-chart-card">
+
+      <h2>Strength Progress</h2>
+    
+      <select id="exerciseChartSelect"></select>
+    
+      <div class="chart-container">
+        <canvas id="exerciseChart"></canvas>
+      </div>
+    
     </section>
 
     <section class="workout-section">
 
+      <!-- PUSH -->
       <div class="workout-card">
         <h2>Push</h2>
-
+    
         <div class="exercise">
-            <span>Bench Press</span>
-            <button class="start-btn">▶</button>
-          </div>
-
-        <div class="exercise">
-          <span>Incline Bench Press</span>
+          <span>Bench Press</span>
           <button class="start-btn">▶</button>
         </div>
-
+    
         <div class="exercise">
-          <span>Shoulder Press</span>
+          <span>Smith Incline Bench Press</span>
           <button class="start-btn">▶</button>
         </div>
-
+    
         <div class="exercise">
-          <span>Side Raise</span>
+          <span>OHP</span>
           <button class="start-btn">▶</button>
         </div>
-
+    
         <div class="exercise">
-          <span>Triceps Pushdown</span>
+          <span>DB Side Raise</span>
+          <button class="start-btn">▶</button>
+        </div>
+    
+        <div class="exercise">
+          <span>Skull Crusher</span>
+          <button class="start-btn">▶</button>
+        </div>
+    
+        <div class="exercise">
+          <span>Cable Pressdown</span>
           <button class="start-btn">▶</button>
         </div>
       </div>
-
+    
+    
+      <!-- PULL -->
       <div class="workout-card">
         <h2>Pull</h2>
-
+    
+        <div class="exercise">
+          <span>Pull Up</span>
+          <button class="start-btn">▶</button>
+        </div>
+    
+        <div class="exercise">
+          <span>Seated Cable Row</span>
+          <button class="start-btn">▶</button>
+        </div>
+    
         <div class="exercise">
           <span>Lat Pulldown</span>
           <button class="start-btn">▶</button>
         </div>
-
-        <div class="exercise">
-          <span>Seated Row</span>
-          <button class="start-btn">▶</button>
-        </div>
-
+    
         <div class="exercise">
           <span>Rear Delt Fly</span>
           <button class="start-btn">▶</button>
         </div>
-
+    
         <div class="exercise">
-          <span>Dumbbell Curl</span>
+          <span>EZ Bar Curl</span>
           <button class="start-btn">▶</button>
         </div>
-
+    
         <div class="exercise">
-          <span>Incline Dumbbell Curl</span>
+          <span>Incline DB Curl</span>
           <button class="start-btn">▶</button>
         </div>
       </div>
-
+    
+    
+      <!-- LEGS -->
       <div class="workout-card">
-        <h2>Leg</h2>
-
+        <h2>Legs</h2>
+    
         <div class="exercise">
-          <span>Squat</span>
+          <span>Barbell Squat</span>
           <button class="start-btn">▶</button>
         </div>
-
+    
+        <div class="exercise">
+          <span>RDL</span>
+          <button class="start-btn">▶</button>
+        </div>
+    
         <div class="exercise">
           <span>Leg Press</span>
           <button class="start-btn">▶</button>
         </div>
-
+    
         <div class="exercise">
-          <span>Romanian Deadlift</span>
+          <span>Leg Curl</span>
           <button class="start-btn">▶</button>
         </div>
-
+    
+        <div class="exercise">
+          <span>Leg Extension</span>
+          <button class="start-btn">▶</button>
+        </div>
+    
         <div class="exercise">
           <span>Calf Raise</span>
           <button class="start-btn">▶</button>
         </div>
       </div>
-
+    
     </section>
 
     <section class="history-section">
@@ -128,24 +237,56 @@
   
       <h2 id="modalExerciseName">Exercise</h2>
   
-      <div class="input-group">
-        <label>Weight</label>
-        <input id="weightInput" type="number" placeholder="60">
-        <span>kg</span>
+      <div class="sets-header">
+        <span>Set</span>
+        <span>Weight</span>
+        <span>Reps</span>
       </div>
   
-      <div class="input-group">
-        <label>Reps</label>
-        <input id="repsInput" type="number" placeholder="10">
-        <span>reps</span>
-      </div>
+      <div id="setsContainer"></div>
   
-      <div class="input-group">
-        <label>Sets</label>
-        <input id="setsInput" type="number" placeholder="3">
-        <span>sets</span>
-      </div>
+      <button id="addSetBtn" class="add-set-btn">
+        ＋ Add Set
+      </button>
   
+      <div class="rest-timer">
+
+        <h3>Rest Timer</h3>
+      
+        <div class="timer-display" id="restTimerDisplay">
+          01:30
+        </div>
+      
+        <div class="timer-controls">
+          <input
+            id="restTimeInput"
+            type="number"
+            min="10"
+            step="10"
+            value="90"
+          >
+          <span>sec</span>
+      
+          <button id="startRestBtn">
+            Start
+          </button>
+      
+          <button id="resetRestBtn">
+            Reset
+          </button>
+        </div>
+      
+      </div>
+      
+      <label class="next-default-option">
+        <input
+          id="useAsNextDefault"
+          type="checkbox"
+          checked
+        >
+        この記録を次回の初期値にする
+      </label>
+      
       <button id="saveWorkoutBtn" class="save-btn">
         Save Workout
       </button>
@@ -154,6 +295,7 @@
   
   </div>
 
-<script src="script.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
